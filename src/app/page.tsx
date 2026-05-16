@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 
 /* ================================================================
    Dimension data for the 4 MBTI spectrums
@@ -69,11 +70,18 @@ const features = [
    Homepage Component
    ================================================================ */
 export default function HomePage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Handle referral links: ?ref=SHARE_CODE → pass to /test
+  const handleStartTest = useCallback(() => {
+    const ref = new URLSearchParams(window.location.search).get('ref');
+    router.push(ref ? `/test?ref=${ref}` : '/test');
+  }, [router]);
 
   return (
     <main className="min-h-screen flex flex-col">
@@ -139,6 +147,7 @@ export default function HomePage() {
 
           {/* CTA Button */}
           <button
+            onClick={handleStartTest}
             className={`bg-white text-purple-700 font-bold text-lg px-10 py-4 rounded-2xl shadow-2xl shadow-purple-900/30 hover:shadow-purple-900/50 hover:scale-[1.03] active:scale-[0.98] transition-all duration-200 animate-pulse-glow ${
               mounted ? "animate-fade-in-up delay-400" : "opacity-0"
             }`}
@@ -386,7 +395,10 @@ export default function HomePage() {
           <p className="text-sm text-gray-500 mb-6">
             只需3分钟，解锁属于你的人格密码
           </p>
-          <button className="bg-btn-gradient text-white font-bold text-base px-12 py-3.5 rounded-2xl shadow-lg shadow-purple-300/40 hover:shadow-purple-400/50 hover:scale-[1.03] active:scale-[0.98] transition-all duration-200">
+          <button
+            onClick={handleStartTest}
+            className="bg-btn-gradient text-white font-bold text-base px-12 py-3.5 rounded-2xl shadow-lg shadow-purple-300/40 hover:shadow-purple-400/50 hover:scale-[1.03] active:scale-[0.98] transition-all duration-200"
+          >
             立即开始测试 →
           </button>
         </div>

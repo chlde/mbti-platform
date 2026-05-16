@@ -22,8 +22,31 @@ export default function TestPage() {
   // Navigate to results when done
   useEffect(() => {
     if (phase === 'done' && answers.length === totalQuestions) {
-      const encoded = btoa(encodeURIComponent(JSON.stringify(answers)));
-      router.push(`/result?answers=${encoded}`);
+      // Save to Supabase and get sessionId
+      const referrerCode = new URLSearchParams(window.location.search).get('ref');
+      
+      fetch('/api/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers, referrerCode: referrerCode || undefined }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.sessionId) {
+            // Also pass answers as fallback in URL
+            const encoded = btoa(encodeURIComponent(JSON.stringify(answers)));
+            router.push(`/result?s=${data.sessionId}&answers=${encoded}`);
+          } else {
+            // Fallback: use client-side calculation only
+            const encoded = btoa(encodeURIComponent(JSON.stringify(answers)));
+            router.push(`/result?answers=${encoded}`);
+          }
+        })
+        .catch(() => {
+          // Fallback on error
+          const encoded = btoa(encodeURIComponent(JSON.stringify(answers)));
+          router.push(`/result?answers=${encoded}`);
+        });
     }
   }, [phase, answers.length, totalQuestions, router]);
 

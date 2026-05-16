@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useMemo, useState, useCallback, Suspense } from 'react';
+import { useMemo, useState, useCallback, useEffect, Suspense } from 'react';
 import { calculateMBTI, Answer, MBTIResult, Dimension } from '@/lib/mbti-calculator';
 import { typeDescriptions, TypeDescription } from '@/lib/type-descriptions';
 import ResultCard from '@/components/ResultCard';
@@ -16,10 +16,11 @@ function ResultPageContent() {
   const [showToast, setShowToast] = useState(false);
   const [showPoster, setShowPoster] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [serverShareCode, setServerShareCode] = useState<string>('');
 
-  // Decode answers from URL
+  // Decode answers from URL (primary) or calculate client-side
   const { result, description, error } = useMemo(() => {
-    const encoded = searchParams.get('a');
+    const encoded = searchParams.get('answers');
     if (!encoded) {
       return { result: null, description: null, error: '未找到测试结果，请重新开始测试。' };
     }
@@ -46,10 +47,27 @@ function ResultPageContent() {
     }
   }, [searchParams]);
 
-  const shareCode = useMemo(() => {
+  // Fetch server-side session data (share code, referral count)
+  useEffect(() => {
+    const sessionId = searchParams.get('s');
+    if (sessionId) {
+      fetch(`/api/query-session?id=${sessionId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.session?.shareCode) {
+            setServerShareCode(data.session.shareCode);
+          }
+        })
+        .catch(() => {
+          // Silently fail — will use client-side fallback
+        });
+    }
+  }, [searchParams]);
+
+  const shareCode = serverShareCode || useMemo(() => {
     if (!result) return '';
     return btoa(result.type).replace(/=/g, '').slice(0, 6);
-  }, [result]);
+  }, [result, serverShareCode]);
 
   const handleShare = useCallback((platform: string) => {
     // Simulate share action
