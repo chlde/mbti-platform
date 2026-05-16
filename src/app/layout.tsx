@@ -10,6 +10,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://mbti-platform-7h9.pages.dev"),
   title: "MBTI 人格测试 | 发现真实的自己",
   description:
     "28道精选题目，3分钟深度解读你的MBTI人格类型。免费、专业、有趣的性格测试，已有上万人参与。来发现你的真实人格吧！",
@@ -49,6 +50,10 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({
@@ -58,18 +63,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+      <head />
       <body className="min-h-screen bg-subtle-warm">
         {/* Subtle decorative blobs */}
         <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">

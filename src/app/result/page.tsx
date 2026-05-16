@@ -18,6 +18,51 @@ function ResultPageContent() {
   const [copied, setCopied] = useState(false);
   const [serverShareCode, setServerShareCode] = useState<string>('');
 
+  // Dynamically update OG meta tags based on MBTI result
+  useEffect(() => {
+    const encoded = searchParams.get('answers');
+    if (!encoded) return;
+    try {
+      const json = decodeURIComponent(escape(atob(encoded)));
+      const answers: Answer[] = JSON.parse(json);
+      const mbtiResult = calculateMBTI(answers);
+      const desc = typeDescriptions[mbtiResult.type];
+      if (!desc) return;
+
+      const title = `我是${mbtiResult.type}「${desc.name}」——快来测测你的MBTI人格！`;
+      const descText = `${desc.tag}。28道精选题目，3分钟发现你的MBTI人格类型。`;
+
+      // Update document title
+      document.title = `${mbtiResult.type}「${desc.name}」| MBTI 人格测试`;
+
+      // Update or create OG meta tags
+      const setMeta = (property: string, content: string) => {
+        let el = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement;
+        if (!el) {
+          el = document.createElement('meta');
+          el.setAttribute('property', property);
+          document.head.appendChild(el);
+        }
+        el.content = content;
+      };
+
+      setMeta('og:title', title);
+      setMeta('og:description', descText);
+      setMeta('og:image', `${window.location.origin}/og-image.png`);
+
+      // Twitter card
+      let twitterTitle = document.querySelector('meta[name="twitter:title"]') as HTMLMetaElement;
+      if (!twitterTitle) {
+        twitterTitle = document.createElement('meta');
+        twitterTitle.name = 'twitter:title';
+        document.head.appendChild(twitterTitle);
+      }
+      twitterTitle.content = title;
+    } catch {
+      // silently fail
+    }
+  }, [searchParams]);
+
   // Decode answers from URL (primary) or calculate client-side
   const { result, description, error } = useMemo(() => {
     const encoded = searchParams.get('answers');
