@@ -20,11 +20,33 @@ function ResultPageContent() {
 
   // Dynamically update OG meta tags based on MBTI result
   useEffect(() => {
-    const encoded = searchParams.get('answers');
-    if (!encoded) return;
+    let answers: Answer[] | null = null;
+
+    // Try sessionStorage first (new flow)
+    const sessionData = sessionStorage.getItem('mbti-answers');
+    if (sessionData) {
+      try {
+        answers = JSON.parse(sessionData);
+      } catch {
+        // fall through to URL
+      }
+    }
+
+    // Fallback: decode from URL param (old links)
+    if (!answers) {
+      const encoded = searchParams.get('answers');
+      if (encoded) {
+        try {
+          const json = decodeURIComponent(escape(atob(encoded)));
+          answers = JSON.parse(json);
+        } catch {
+          return;
+        }
+      }
+    }
+
+    if (!answers) return;
     try {
-      const json = decodeURIComponent(escape(atob(encoded)));
-      const answers: Answer[] = JSON.parse(json);
       const mbtiResult = calculateMBTI(answers);
       const desc = typeDescriptions[mbtiResult.type];
       if (!desc) return;
@@ -63,18 +85,38 @@ function ResultPageContent() {
     }
   }, [searchParams]);
 
-  // Decode answers from URL (primary) or calculate client-side
+  // Decode answers from sessionStorage (primary) or URL fallback, then calculate result
   const { result, description, error } = useMemo(() => {
-    const encoded = searchParams.get('answers');
-    if (!encoded) {
-      return { result: null, description: null, error: '未找到测试结果，请重新开始测试。' };
+    let answers: Answer[] | null = null;
+
+    // Try sessionStorage first (new flow)
+    const sessionData = sessionStorage.getItem('mbti-answers');
+    if (sessionData) {
+      try {
+        answers = JSON.parse(sessionData);
+        // Clear after reading so it's not reused on refresh
+        sessionStorage.removeItem('mbti-answers');
+      } catch {
+        // fall through to URL fallback
+      }
+    }
+
+    // Fallback: decode from URL param (backward compatibility for old links)
+    if (!answers) {
+      const encoded = searchParams.get('answers');
+      if (!encoded) {
+        return { result: null, description: null, error: '未找到测试结果，请重新开始测试。' };
+      }
+
+      try {
+        const json = decodeURIComponent(escape(atob(encoded)));
+        answers = JSON.parse(json);
+      } catch {
+        return { result: null, description: null, error: '测试数据解析失败，请重新开始测试。' };
+      }
     }
 
     try {
-      // Decode base64 → JSON
-      const json = decodeURIComponent(escape(atob(encoded)));
-      const answers: Answer[] = JSON.parse(json);
-
       if (!Array.isArray(answers) || answers.length === 0) {
         return { result: null, description: null, error: '测试数据为空，请重新开始测试。' };
       }

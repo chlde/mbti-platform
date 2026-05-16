@@ -22,6 +22,9 @@ export default function TestPage() {
   // Navigate to results when done
   useEffect(() => {
     if (phase === 'done' && answers.length === totalQuestions) {
+      // Save answers to sessionStorage BEFORE navigating (avoids URL length limits)
+      sessionStorage.setItem('mbti-answers', JSON.stringify(answers));
+
       // Save to Supabase and get sessionId
       const referrerCode = new URLSearchParams(window.location.search).get('ref');
       
@@ -33,19 +36,13 @@ export default function TestPage() {
         .then((res) => res.json())
         .then((data) => {
           if (data.sessionId) {
-            // Also pass answers as fallback in URL
-            const encoded = btoa(encodeURIComponent(JSON.stringify(answers)));
-            router.push(`/result?s=${data.sessionId}&answers=${encoded}`);
+            router.push(`/result?s=${data.sessionId}`);
           } else {
-            // Fallback: use client-side calculation only
-            const encoded = btoa(encodeURIComponent(JSON.stringify(answers)));
-            router.push(`/result?answers=${encoded}`);
+            router.push('/result');
           }
         })
         .catch(() => {
-          // Fallback on error
-          const encoded = btoa(encodeURIComponent(JSON.stringify(answers)));
-          router.push(`/result?answers=${encoded}`);
+          router.push('/result');
         });
     }
   }, [phase, answers.length, totalQuestions, router]);
