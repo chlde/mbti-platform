@@ -1,3 +1,237 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ===== Custom Gradient Backgrounds ===== */
+@layer utilities {
+  .bg-hero-gradient {
+    background: linear-gradient(135deg, #7c3aed 0%, #c026d3 30%, #ec4899 55%, #f97316 85%, #fbbf24 100%);
+  }
+
+  .bg-card-gradient {
+    background: linear-gradient(145deg, rgba(124, 58, 237, 0.08) 0%, rgba(236, 72, 153, 0.08) 50%, rgba(249, 115, 22, 0.08) 100%);
+  }
+
+  .bg-subtle-warm {
+    background: linear-gradient(180deg, #fdf4ff 0%, #faf5ff 25%, #fff7ed 50%, #fffbeb 100%);
+  }
+
+  .bg-mock-result {
+    background: linear-gradient(135deg, #7c3aed 0%, #a855f7 40%, #ec4899 100%);
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, #7c3aed, #ec4899, #f97316);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .bg-btn-gradient {
+    background: linear-gradient(135deg, #7c3aed 0%, #c026d3 50%, #ec4899 100%);
+  }
+
+  .bg-btn-gradient:hover {
+    background: linear-gradient(135deg, #6d28d9 0%, #a21caf 50%, #db2777 100%);
+  }
+}
+
+/* ===== Base Styles ===== */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-subtle-warm text-gray-800 antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background-color: rgba(236, 72, 153, 0.25);
+    color: #7c3aed;
+  }
+}
+
+/* ===== Card Component ===== */
+@layer components {
+  .card {
+    @apply rounded-2xl bg-white/80 backdrop-blur-sm border border-white/60 shadow-lg shadow-purple-100/30;
+  }
+
+  .card-hover {
+    @apply card transition-all duration-300 ease-out;
+  }
+
+  .card-hover:hover {
+    @apply -translate-y-1 shadow-xl shadow-purple-200/40;
+  }
+}
+
+/* ===== Animations ===== */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(192, 38, 211, 0.5),
+                0 0 20px rgba(236, 72, 153, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(192, 38, 211, 0),
+                0 0 40px rgba(236, 72, 153, 0.15);
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes progress-fill {
+  from { width: 0%; }
+  to { width: var(--progress, 0%); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes hero-gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes count-up {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* ===== Animation Utility Classes ===== */
+@layer utilities {
+  .animate-fade-in-up {
+    animation: fadeInUp 0.6s ease-out both;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out both;
+  }
+
+  .animate-slide-in-left {
+    animation: slideInLeft 0.6s ease-out both;
+  }
+
+  .animate-slide-in-right {
+    animation: slideInRight 0.6s ease-out both;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-progress {
+    animation: progress-fill 0.8s ease-out forwards;
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.4) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s ease-in-out infinite;
+  }
+
+  .animate-hero-gradient {
+    background-size: 200% 200%;
+    animation: hero-gradient-shift 8s ease infinite;
+  }
+
+  .animate-count-up {
+    animation: count-up 0.6s ease-out both;
+  }
+
+  /* Stagger delays */
+  .delay-100 { animation-delay: 100ms; }
+  .delay-200 { animation-delay: 200ms; }
+  .delay-300 { animation-delay: 300ms; }
+  .delay-400 { animation-delay: 400ms; }
+  .delay-500 { animation-delay: 500ms; }
+  .delay-600 { animation-delay: 600ms; }
+  .delay-700 { animation-delay: 700ms; }
+  .delay-800 { animation-delay: 800ms; }
+}
+
+/* ===== Progress Bar ===== */
+.progress-bar {
+  @apply h-1.5 rounded-full bg-purple-100 overflow-hidden;
+}
+
+.progress-bar-fill {
+  @apply h-full rounded-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400;
+  animation: progress-fill 0.8s ease-out forwards;
+}
+
+/* ===== Hide Scrollbar ===== */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ===== Glass Effect ===== */
+.glass {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
