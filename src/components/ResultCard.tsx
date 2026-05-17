@@ -2,6 +2,7 @@
 
 import { TypeDescription } from '@/lib/type-descriptions';
 import { MBTIResult, Dimension, DimensionScore } from '@/lib/mbti-calculator';
+import PersonalityAvatar from '@/components/PersonalityAvatar';
 
 interface ResultCardProps {
   mbtiType: string;
@@ -82,6 +83,11 @@ export default function ResultCard({ mbtiType, description, dimensions, revealed
             {/* Decorative circles */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-purple-200/20 rounded-full -translate-y-1/2 translate-x-1/2" />
             <div className="absolute bottom-0 left-0 w-24 h-24 bg-pink-200/20 rounded-full translate-y-1/2 -translate-x-1/2" />
+
+            {/* Personality Avatar */}
+            <div className="relative flex justify-center mb-4">
+              <PersonalityAvatar mbtiType={mbtiType} revealed={revealed} size="md" />
+            </div>
 
             {/* Type code */}
             <div className="relative text-center">
