@@ -437,8 +437,6 @@ function Counter({ target }: { target: number }) {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
-    if (count >= target) return;
-
     const duration = 2000; // 2 seconds
     const steps = 60;
     const increment = target / steps;
@@ -455,7 +453,7 @@ function Counter({ target }: { target: number }) {
     }, duration / steps);
 
     return () => clearInterval(timer);
-  }, [target, count]);
+  }, [target]);
 
   return <>{count.toLocaleString()}</>;
 }
