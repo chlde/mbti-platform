@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { calculateMBTI, Answer } from '@/lib/mbti-calculator';
-import { freeQuestions } from '@/lib/question-bank-free';
+import { freeQuestions, TOTAL_QUESTIONS } from '@/lib/question-bank-free';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { answers, referrerCode } = body as {
+    const { answers, referrerCode, questionIds } = body as {
       answers: Answer[];
       referrerCode?: string;
+      questionIds?: number[];
     };
 
     // Validate answers
@@ -19,12 +20,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate answer count matches free question bank
-    if (answers.length !== freeQuestions.length) {
+    // Validate answer count (should be TOTAL_QUESTIONS)
+    if (answers.length !== TOTAL_QUESTIONS) {
       return NextResponse.json(
-        { error: `需要完成全部 ${freeQuestions.length} 道题目` },
+        { error: `需要完成全部 ${TOTAL_QUESTIONS} 道题目` },
         { status: 400 }
       );
+    }
+
+    // Validate choice values (1-5)
+    for (const a of answers) {
+      if (![1, 2, 3, 4, 5].includes(a.choice)) {
+        return NextResponse.json(
+          { error: '无效的选项值' },
+          { status: 400 }
+        );
+      }
     }
 
     // Calculate MBTI result

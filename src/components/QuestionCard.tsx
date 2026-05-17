@@ -5,10 +5,18 @@ import { Question } from '@/lib/question-bank-free';
 
 interface QuestionCardProps {
   question: Question;
-  onAnswer: (choice: 'A' | 'B') => void;
+  onAnswer: (choice: 1 | 2 | 3 | 4 | 5) => void;
   questionNumber: number;
   totalQuestions: number;
 }
+
+const OPTION_LABELS = [
+  { value: 1, label: '完全选这', emoji: '💪' },
+  { value: 2, label: '比较选这', emoji: '👍' },
+  { value: 3, label: '都差不多', emoji: '🤷' },
+  { value: 4, label: '比较选这', emoji: '👍' },
+  { value: 5, label: '完全选这', emoji: '💪' },
+] as const;
 
 export default function QuestionCard({
   question,
@@ -16,18 +24,26 @@ export default function QuestionCard({
   questionNumber,
   totalQuestions,
 }: QuestionCardProps) {
-  const [selected, setSelected] = useState<'A' | 'B' | null>(null);
+  const [selected, setSelected] = useState<1 | 2 | 3 | 4 | 5 | null>(null);
+  const [hovered, setHovered] = useState<number | null>(null);
 
   const handleSelect = useCallback(
-    (choice: 'A' | 'B') => {
-      if (selected) return; // prevent double-tap
+    (choice: 1 | 2 | 3 | 4 | 5) => {
+      if (selected) return;
       setSelected(choice);
       setTimeout(() => {
         onAnswer(choice);
-      }, 300);
+      }, 400);
     },
     [selected, onAnswer],
   );
+
+  // Highlight intensity for the gradient bar at bottom
+  const getBarWidth = (optValue: number) => {
+    if (!selected) return '0%';
+    if (selected === optValue) return '100%';
+    return '0%';
+  };
 
   return (
     <div className="w-full max-w-lg mx-auto px-5">
@@ -46,111 +62,106 @@ export default function QuestionCard({
         {question.text}
       </h2>
 
-      {/* Options */}
-      <div className="space-y-3">
-        {/* Option A */}
-        <button
-          type="button"
-          onClick={() => handleSelect('A')}
-          disabled={!!selected}
-          className={`
-            group relative w-full text-left rounded-2xl border-2 p-4 sm:p-5
-            transition-all duration-200 ease-out
-            focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400
-            ${
-              selected === 'A'
-                ? 'border-purple-400 bg-purple-50 scale-[1.02] shadow-lg shadow-purple-200/50'
-                : selected === 'B'
-                ? 'border-gray-200 bg-gray-50/50 opacity-50 scale-[0.98]'
-                : 'border-purple-200/60 bg-white/80 hover:border-purple-300 hover:bg-purple-50/40 hover:shadow-md active:scale-[0.98]'
-            }
-          `}
-        >
-          {/* Gradient accent bar */}
-          <div
-            className={`
-            absolute left-0 top-3 bottom-3 w-1 rounded-r-full transition-colors duration-200
-            ${selected === 'A' ? 'bg-gradient-to-b from-purple-500 to-pink-500' : 'bg-purple-200 group-hover:bg-purple-300'}
-          `}
-          />
+      {/* Two poles display */}
+      <div className="flex justify-between items-center mb-5 px-2">
+        <div className={`flex-1 text-center transition-all duration-300 ${
+          selected && selected <= 2 ? 'scale-105 opacity-100' : selected ? 'opacity-40' : ''
+        }`}>
+          <span className="text-sm font-bold text-purple-600 block">A</span>
+          <span className="text-xs sm:text-sm text-gray-600 leading-snug block mt-1">{question.poleA}</span>
+        </div>
+        <div className="mx-3 text-gray-300 text-lg select-none">⟷</div>
+        <div className={`flex-1 text-center transition-all duration-300 ${
+          selected && selected >= 4 ? 'scale-105 opacity-100' : selected ? 'opacity-40' : ''
+        }`}>
+          <span className="text-sm font-bold text-pink-600 block">B</span>
+          <span className="text-xs sm:text-sm text-gray-600 leading-snug block mt-1">{question.poleB}</span>
+        </div>
+      </div>
 
-          <div className="flex items-start gap-3 pl-3">
-            {/* Letter badge */}
-            <span
-              className={`
-              flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold
-              transition-colors duration-200
-              ${
-                selected === 'A'
-                  ? 'bg-gradient-to-br from-purple-500 to-pink-500 text-white'
-                  : 'bg-purple-100 text-purple-600 group-hover:bg-purple-200'
+      {/* 5-option scale */}
+      <div className="mt-6">
+        <div className="flex gap-2">
+          {OPTION_LABELS.map((opt) => {
+            const isSelected = selected === opt.value;
+            const isHovered = hovered === opt.value && !selected;
+            const isLeftSide = opt.value <= 2;
+            const isRightSide = opt.value >= 4;
+            const isMiddle = opt.value === 3;
+
+            let bgColor = 'bg-white';
+            let borderColor = 'border-gray-200';
+            let textColor = 'text-gray-600';
+            let scale = '';
+
+            if (isSelected) {
+              if (isLeftSide) {
+                bgColor = 'bg-purple-50';
+                borderColor = 'border-purple-400';
+                textColor = 'text-purple-700';
+              } else if (isRightSide) {
+                bgColor = 'bg-pink-50';
+                borderColor = 'border-pink-400';
+                textColor = 'text-pink-700';
+              } else {
+                bgColor = 'bg-gray-50';
+                borderColor = 'border-gray-400';
+                textColor = 'text-gray-700';
               }
-            `}
-            >
-              A
-            </span>
-            <p
-              className={`
-              text-sm sm:text-base leading-relaxed pt-0.5 transition-colors duration-200
-              ${selected === 'A' ? 'text-purple-900 font-medium' : 'text-gray-700'}
-            `}
-            >
-              {question.optionA}
-            </p>
-          </div>
-        </button>
-
-        {/* Option B */}
-        <button
-          type="button"
-          onClick={() => handleSelect('B')}
-          disabled={!!selected}
-          className={`
-            group relative w-full text-left rounded-2xl border-2 p-4 sm:p-5
-            transition-all duration-200 ease-out
-            focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400
-            ${
-              selected === 'B'
-                ? 'border-pink-400 bg-pink-50 scale-[1.02] shadow-lg shadow-pink-200/50'
-                : selected === 'A'
-                ? 'border-gray-200 bg-gray-50/50 opacity-50 scale-[0.98]'
-                : 'border-pink-200/60 bg-white/80 hover:border-pink-300 hover:bg-pink-50/40 hover:shadow-md active:scale-[0.98]'
-            }
-          `}
-        >
-          {/* Gradient accent bar */}
-          <div
-            className={`
-            absolute left-0 top-3 bottom-3 w-1 rounded-r-full transition-colors duration-200
-            ${selected === 'B' ? 'bg-gradient-to-b from-pink-500 to-orange-400' : 'bg-pink-200 group-hover:bg-pink-300'}
-          `}
-          />
-
-          <div className="flex items-start gap-3 pl-3">
-            {/* Letter badge */}
-            <span
-              className={`
-              flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold
-              transition-colors duration-200
-              ${
-                selected === 'B'
-                  ? 'bg-gradient-to-br from-pink-500 to-orange-400 text-white'
-                  : 'bg-pink-100 text-pink-600 group-hover:bg-pink-200'
+              scale = 'scale-105 shadow-lg';
+            } else if (selected) {
+              bgColor = 'bg-gray-50';
+              borderColor = 'border-gray-100';
+              textColor = 'text-gray-300';
+              scale = 'scale-95 opacity-50';
+            } else if (isHovered) {
+              if (isLeftSide) {
+                bgColor = 'bg-purple-50/50';
+                borderColor = 'border-purple-300';
+                textColor = 'text-purple-600';
+              } else if (isRightSide) {
+                bgColor = 'bg-pink-50/50';
+                borderColor = 'border-pink-300';
+                textColor = 'text-pink-600';
+              } else {
+                bgColor = 'bg-gray-50';
+                borderColor = 'border-gray-300';
+                textColor = 'text-gray-600';
               }
-            `}
-            >
-              B
-            </span>
-            <p
-              className={`
-              text-sm sm:text-base leading-relaxed pt-0.5 transition-colors duration-200
-              ${selected === 'B' ? 'text-pink-900 font-medium' : 'text-gray-700'}
-            `}
-            >
-              {question.optionB}
-            </p>
-          </div>
-        </button>
+              scale = 'scale-105';
+            }
+
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => handleSelect(opt.value as 1 | 2 | 3 | 4 | 5)}
+                onMouseEnter={() => setHovered(opt.value)}
+                onMouseLeave={() => setHovered(null)}
+                disabled={!!selected}
+                className={`
+                  flex-1 flex flex-col items-center gap-1.5 py-3.5 rounded-2xl border-2
+                  transition-all duration-200 ease-out
+                  focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400
+                  active:scale-95
+                  ${bgColor} ${borderColor} ${textColor} ${scale}
+                `}
+              >
+                <span className="text-lg leading-none">{opt.emoji}</span>
+                <span className="text-[10px] sm:text-xs font-semibold leading-tight text-center whitespace-nowrap">
+                  {opt.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Scale labels below */}
+        <div className="flex justify-between mt-2 px-3">
+          <span className="text-[10px] text-gray-400">← 倾向 A</span>
+          <span className="text-[10px] text-gray-400">中立</span>
+          <span className="text-[10px] text-gray-400">倾向 B →</span>
+        </div>
       </div>
     </div>
   );

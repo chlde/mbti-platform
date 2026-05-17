@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       if (
         !a ||
         typeof a.questionId !== 'number' ||
-        (a.choice !== 'A' && a.choice !== 'B')
+        ![1, 2, 3, 4, 5].includes(a.choice)
       ) {
         return NextResponse.json(
           { error: `第 ${i + 1} 个答案格式错误` },

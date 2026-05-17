@@ -1,4 +1,4 @@
-import { freeQuestions, Question } from './question-bank-free';
+import { freeQuestions, Question, TOTAL_QUESTIONS } from './question-bank-free';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -12,9 +12,17 @@ export type MBTIType =
 
 export type Dimension = 'EI' | 'SN' | 'TF' | 'JP';
 
+/**
+ * 5选项量表：
+ *   1 = 完全选A (强烈倾向A端)
+ *   2 = 比较选A (倾向A端)
+ *   3 = 中立/不确定
+ *   4 = 比较选B (倾向B端)
+ *   5 = 完全选B (强烈倾向B端)
+ */
 export interface Answer {
   questionId: number;
-  choice: 'A' | 'B';
+  choice: 1 | 2 | 3 | 4 | 5;
 }
 
 /** Confidence bucket derived from how decisive the scores are. */
@@ -48,22 +56,13 @@ export interface MBTIResult {
 // ---------------------------------------------------------------------------
 
 const DIMENSION_LEFT: Record<Dimension, string> = {
-  EI: 'E',
-  SN: 'S',
-  TF: 'T',
-  JP: 'J',
+  EI: 'E', SN: 'S', TF: 'T', JP: 'J',
 };
 
 const DIMENSION_RIGHT: Record<Dimension, string> = {
-  EI: 'I',
-  SN: 'N',
-  TF: 'F',
-  JP: 'P',
+  EI: 'I', SN: 'N', TF: 'F', JP: 'P',
 };
 
-/**
- * Build a fast lookup map: questionId → Question
- */
 function buildQuestionMap(questions: Question[]): Map<number, Question> {
   const map = new Map<number, Question>();
   for (const q of questions) {
@@ -72,91 +71,84 @@ function buildQuestionMap(questions: Question[]): Map<number, Question> {
   return map;
 }
 
-// Pre-build the map once (module-level cache).
-const questionMap = buildQuestionMap(freeQuestions);
-
 // ---------------------------------------------------------------------------
 // Core calculator
 // ---------------------------------------------------------------------------
 
 /**
- * Calculate the full MBTI result from an array of answers.
+ * Calculate MBTI from 5-option Likert scale answers.
  *
- * Scoring logic per question:
- *   - Each question belongs to one of four dimensions (EI, SN, TF, JP).
- *   - `weightA` tells us which pole option-A leans toward:
- *       `'left'`  → A scores for the left pole  (E/S/T/J)
- *       `'right'` → A scores for the right pole (I/N/F/P)
- *   - Picking the opposite option naturally scores for the other pole.
- *   - Within a dimension the `ratio` is:  rightCount / totalAnswered
- *       0   → fully left pole
- *       1   → fully right pole
- *       0.5 → perfectly balanced
- *
- * @param answers  Array of { questionId, choice } responses.
- * @param questions  Optional custom question array (defaults to `freeQuestions`).
+ * Scoring: each answer maps to a weight toward the A or B pole:
+ *   choice 1 (完全选A): +2.0 to A's direction
+ *   choice 2 (比较选A): +1.0 to A's direction
+ *   choice 3 (中立):    +0.5 to each (essentially no contribution)
+ *   choice 4 (比较选B): +1.0 to B's direction
+ *   choice 5 (完全选B): +2.0 to B's direction
  */
 export function calculateMBTI(
   answers: Answer[],
   questions: Question[] = freeQuestions,
 ): MBTIResult {
-  // Build lookup from the provided (or default) question bank.
   const qMap = questions === freeQuestions
-    ? questionMap
+    ? buildQuestionMap(freeQuestions)
     : buildQuestionMap(questions);
 
-  // Accumulate left / right counts per dimension.
-  const counts: Record<Dimension, { left: number; right: number }> = {
-    EI: { left: 0, right: 0 },
-    SN: { left: 0, right: 0 },
-    TF: { left: 0, right: 0 },
-    JP: { left: 0, right: 0 },
+  // Accumulate weighted scores per dimension
+  const scores: Record<Dimension, { left: number; right: number; answered: number }> = {
+    EI: { left: 0, right: 0, answered: 0 },
+    SN: { left: 0, right: 0, answered: 0 },
+    TF: { left: 0, right: 0, answered: 0 },
+    JP: { left: 0, right: 0, answered: 0 },
   };
 
   for (const answer of answers) {
     const question = qMap.get(answer.questionId);
-    if (!question) {
-      // Skip unknown question IDs gracefully.
-      continue;
-    }
+    if (!question) continue;
 
     const dim = question.dimension;
-    const isLeft = answer.choice === 'A'
-      ? question.weightA === 'left'
-      : question.weightA !== 'left';   // choice B flips the weight
 
-    if (isLeft) {
-      counts[dim].left += 1;
-    } else {
-      counts[dim].right += 1;
+    // Calculate direction weight
+    // choice 1-2 = A direction, 4-5 = B direction, 3 = neutral
+    let aWeight = 0;
+    let bWeight = 0;
+
+    switch (answer.choice) {
+      case 1: aWeight = 2.0; break;  // 完全选A
+      case 2: aWeight = 1.0; break;  // 比较选A
+      case 3: aWeight = 0.5; bWeight = 0.5; break; // 中立
+      case 4: bWeight = 1.0; break;  // 比较选B
+      case 5: bWeight = 2.0; break;  // 完全选B
     }
+
+    // Map to left/right based on weightA
+    if (question.weightA === 'left') {
+      scores[dim].left += aWeight;
+      scores[dim].right += bWeight;
+    } else {
+      scores[dim].left += bWeight;
+      scores[dim].right += aWeight;
+    }
+    scores[dim].answered += 1;
   }
 
-  // Derive DimensionScore for each dimension.
+  // Derive DimensionScore for each dimension
   const dimensionScores: Record<Dimension, DimensionScore> = {} as Record<Dimension, DimensionScore>;
 
   for (const dim of ['EI', 'SN', 'TF', 'JP'] as Dimension[]) {
-    const { left, right } = counts[dim];
+    const { left, right, answered } = scores[dim];
     const total = left + right;
 
-    const ratio = total === 0 ? 0.5 : right / total;   // neutral when unanswered
+    const ratio = total === 0 ? 0.5 : right / total;
     const leftPct  = total === 0 ? 50 : Math.round((left / total) * 100);
     const rightPct = total === 0 ? 50 : Math.round((right / total) * 100);
 
     const winner = ratio > 0.5
       ? DIMENSION_RIGHT[dim]
-      : DIMENSION_LEFT[dim];    // tie → left pole wins by convention
+      : DIMENSION_LEFT[dim];
 
-    dimensionScores[dim] = {
-      ratio,
-      left: leftPct,
-      right: rightPct,
-      winner,
-      answered: total,
-    };
+    dimensionScores[dim] = { ratio, left: leftPct, right: rightPct, winner, answered };
   }
 
-  // Assemble the four-letter MBTI type.
   const type = (
     dimensionScores.EI.winner +
     dimensionScores.SN.winner +
@@ -164,13 +156,11 @@ export function calculateMBTI(
     dimensionScores.JP.winner
   ) as MBTIType;
 
-  // Determine overall confidence.
   const confidence = computeConfidence(dimensionScores);
 
-  // Build human-readable summary lines.
   const summary = (['EI', 'SN', 'TF', 'JP'] as Dimension[]).map((dim) => {
-    const score = dimensionScores[dim];
-    return `${DIMENSION_LEFT[dim]} ${score.left}% · ${DIMENSION_RIGHT[dim]} ${score.right}%`;
+    const s = dimensionScores[dim];
+    return `${DIMENSION_LEFT[dim]} ${s.left}% · ${DIMENSION_RIGHT[dim]} ${s.right}%`;
   });
 
   return { type, dimensions: dimensionScores, confidence, summary };
@@ -180,28 +170,13 @@ export function calculateMBTI(
 // Confidence
 // ---------------------------------------------------------------------------
 
-/**
- * Confidence is derived from the average absolute distance of each dimension's
- * ratio from 0.5 (the neutral midpoint).
- *
- *   avg distance ≥ 0.30  →  "high"
- *   avg distance ≥ 0.15  →  "medium"
- *   otherwise            →  "low"
- *
- * Dimensions with zero answered questions are treated as neutral (0.5),
- * which pulls confidence toward "low".
- */
-function computeConfidence(
-  dims: Record<Dimension, DimensionScore>,
-): ConfidenceLevel {
-  const dimensionKeys: Dimension[] = ['EI', 'SN', 'TF', 'JP'];
-
+function computeConfidence(dims: Record<Dimension, DimensionScore>): ConfidenceLevel {
   let totalDistance = 0;
   let answeredCount = 0;
 
-  for (const dim of dimensionKeys) {
+  for (const dim of ['EI', 'SN', 'TF', 'JP'] as Dimension[]) {
     const score = dims[dim];
-    if (score.answered === 0) continue;   // skip unanswered dimensions
+    if (score.answered === 0) continue;
     totalDistance += Math.abs(score.ratio - 0.5);
     answeredCount += 1;
   }
@@ -209,35 +184,15 @@ function computeConfidence(
   if (answeredCount === 0) return 'low';
 
   const avgDistance = totalDistance / answeredCount;
-
   if (avgDistance >= 0.30) return 'high';
   if (avgDistance >= 0.15) return 'medium';
   return 'low';
 }
 
-// ---------------------------------------------------------------------------
-// Convenience: calculate from simple { questionId, choice } objects
-// ---------------------------------------------------------------------------
-
-/**
- * Quick one-liner if you already have answers in the expected format.
- *
- * ```ts
- * import { quickCalc } from './mbti-calculator';
- * const result = quickCalc([
- *   { questionId: 1, choice: 'A' },
- *   { questionId: 2, choice: 'B' },
- *   ...
- * ]);
- * ```
- */
 export function quickCalc(answers: Answer[]): MBTIResult {
   return calculateMBTI(answers);
 }
 
-/**
- * Utility: get just the four-letter type string.
- */
 export function getMBTIType(answers: Answer[]): MBTIType {
   return calculateMBTI(answers).type;
 }

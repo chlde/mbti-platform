@@ -16,14 +16,12 @@ function ResultPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // All hooks declared at the top — count is always fixed
   const [phase, setPhase] = useState<'locked' | 'sharing' | 'unlocked'>('locked');
   const [showToast, setShowToast] = useState(false);
   const [showPoster, setShowPoster] = useState(false);
   const [copied, setCopied] = useState(false);
   const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' });
 
-  // Fetch result data from server API using sessionId
   useEffect(() => {
     const sessionId = searchParams.get('s');
     if (!sessionId) {
@@ -43,14 +41,10 @@ function ResultPageContent() {
           return;
         }
 
-        // Recalculate full result from answers (most reliable)
         let result: MBTIResult;
         if (Array.isArray(session.answers) && session.answers.length > 0) {
           result = calculateMBTI(session.answers as Answer[]);
         } else {
-          // Fallback: reconstruct DimensionScore objects from raw dimension_scores
-          // Old sessions stored raw numbers like {EI:-7, SN:-7, TF:-7, JP:-7}
-          // Each dimension has 7 questions, raw score = rightCount - leftCount
           const rawScores = session.dimensionScores || {};
           const dims: Dimension[] = ['EI', 'SN', 'TF', 'JP'];
           const DIM_LEFT: Record<Dimension, string> = { EI: 'E', SN: 'S', TF: 'T', JP: 'J' };
@@ -60,43 +54,26 @@ function ResultPageContent() {
           const dimensions = {} as Record<Dimension, DimensionScore>;
           for (const dim of dims) {
             const raw = typeof rawScores[dim] === 'number' ? rawScores[dim] : 0;
-            // If raw is already a DimensionScore object (has 'ratio'), use it directly
             if (typeof rawScores[dim] === 'object' && rawScores[dim] !== null && 'ratio' in (rawScores[dim] as object)) {
               dimensions[dim] = rawScores[dim] as unknown as DimensionScore;
               continue;
             }
-            // raw = leftCount - rightCount (negative means right wins)
-            // leftCount = (total + raw) / 2, rightCount = (total - raw) / 2
             const leftCount = Math.max(0, Math.min(questionsPerDim, (questionsPerDim + raw) / 2));
             const rightCount = questionsPerDim - leftCount;
             const ratio = rightCount / questionsPerDim;
             const leftPct = Math.round((leftCount / questionsPerDim) * 100);
             const rightPct = Math.round((rightCount / questionsPerDim) * 100);
             const winner = ratio > 0.5 ? DIM_RIGHT[dim] : DIM_LEFT[dim];
-
-            dimensions[dim] = {
-              ratio,
-              left: leftPct,
-              right: rightPct,
-              winner,
-              answered: questionsPerDim,
-            };
+            dimensions[dim] = { ratio, left: leftPct, right: rightPct, winner, answered: questionsPerDim };
           }
 
           const summary = dims.map(dim => {
             const s = dimensions[dim];
             return `${DIM_LEFT[dim]} ${s.left}% · ${DIM_RIGHT[dim]} ${s.right}%`;
           });
-
-          result = {
-            type: session.mbtiType,
-            dimensions,
-            confidence: 'high',
-            summary,
-          };
+          result = { type: session.mbtiType, dimensions, confidence: 'high', summary };
         }
 
-        // Use recalculated type (from answers) for description lookup — more reliable than stored mbtiType
         const desc = typeDescriptions[result.type as keyof typeof typeDescriptions];
         if (!desc) {
           setLoadState({ status: 'error', message: '未知的人格类型，请重新测试。' });
@@ -104,34 +81,22 @@ function ResultPageContent() {
         }
 
         const shareCode = session.shareCode || btoa(result.type).replace(/=/g, '').slice(0, 6);
-
         setLoadState({ status: 'loaded', result, description: desc, shareCode });
 
-        // Update meta tags
         const title = `我是${result.type}「${desc.name}」——快来测测你的MBTI人格！`;
-        const descText = `${desc.tag}。28道精选题目，3分钟发现你的MBTI人格类型。`;
         document.title = `${result.type}「${desc.name}」| MBTI 人格测试`;
 
         const setMeta = (property: string, content: string) => {
           let el = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement;
-          if (!el) {
-            el = document.createElement('meta');
-            el.setAttribute('property', property);
-            document.head.appendChild(el);
-          }
+          if (!el) { el = document.createElement('meta'); el.setAttribute('property', property); document.head.appendChild(el); }
           el.content = content;
         };
-
         setMeta('og:title', title);
-        setMeta('og:description', descText);
+        setMeta('og:description', `${desc.tag}。28道精选题目，3分钟发现你的MBTI人格类型。`);
         setMeta('og:image', `${window.location.origin}/og-image.png`);
 
         let twitterTitle = document.querySelector('meta[name="twitter:title"]') as HTMLMetaElement;
-        if (!twitterTitle) {
-          twitterTitle = document.createElement('meta');
-          twitterTitle.name = 'twitter:title';
-          document.head.appendChild(twitterTitle);
-        }
+        if (!twitterTitle) { twitterTitle = document.createElement('meta'); twitterTitle.name = 'twitter:title'; document.head.appendChild(twitterTitle); }
         twitterTitle.content = title;
       })
       .catch(() => {
@@ -139,28 +104,19 @@ function ResultPageContent() {
       });
   }, [searchParams]);
 
-  // Extract values for use in render (hooks must not be conditional)
   const result = loadState.status === 'loaded' ? loadState.result : null;
   const description = loadState.status === 'loaded' ? loadState.description : null;
   const shareCode = loadState.status === 'loaded' ? loadState.shareCode : '';
 
   const handleShare = useCallback((platform: string) => {
-    // Simulate share action
     setShowToast(true);
     setPhase('sharing');
-
-    // After 1.5s, reveal the full result
     setTimeout(() => {
       setPhase('unlocked');
       setShowToast(false);
-
-      // After another 0.5s, show the poster section
-      setTimeout(() => {
-        setShowPoster(true);
-      }, 500);
+      setTimeout(() => setShowPoster(true), 500);
     }, 1500);
 
-    // For copy link, actually copy
     if (platform === 'copy') {
       const url = `${window.location.origin}?ref=${shareCode}`;
       navigator.clipboard.writeText(url).then(() => {
@@ -170,30 +126,37 @@ function ResultPageContent() {
     }
   }, [shareCode]);
 
-  // Loading state
   if (loadState.status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-purple-50 via-pink-50/30 to-white">
         <div className="text-center">
-          <div className="w-10 h-10 border-3 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 font-medium">正在分析你的人格...</p>
-          <p className="text-gray-400 text-sm mt-1">请稍候</p>
+          <div className="relative w-20 h-20 mx-auto mb-6">
+            <div className="absolute inset-0 rounded-full border-4 border-purple-200" />
+            <div className="absolute inset-0 rounded-full border-4 border-purple-500 border-t-transparent animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center text-2xl">🧠</div>
+          </div>
+          <p className="text-gray-600 font-semibold text-lg">正在分析你的人格...</p>
+          <p className="text-gray-400 text-sm mt-2">解读你的性格密码中</p>
+          <div className="flex justify-center gap-1 mt-4">
+            <div className="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+            <div className="w-2 h-2 rounded-full bg-pink-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+            <div className="w-2 h-2 rounded-full bg-orange-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
         </div>
       </div>
     );
   }
 
-  // Error state
   if (loadState.status === 'error') {
     return (
-      <div className="min-h-screen flex items-center justify-center px-5">
+      <div className="min-h-screen flex items-center justify-center px-5 bg-gradient-to-b from-purple-50 via-pink-50/30 to-white">
         <div className="text-center max-w-sm">
-          <div className="text-6xl mb-4">😢</div>
+          <div className="text-7xl mb-4">😢</div>
           <h1 className="text-xl font-bold text-gray-800 mb-2">出错了</h1>
           <p className="text-gray-500 text-sm mb-6">{loadState.message}</p>
           <button
-            onClick={() => router.push('/')}
-            className="px-6 py-3 rounded-2xl bg-btn-gradient text-white font-semibold text-sm shadow-lg shadow-purple-200/50 active:scale-[0.97] transition-transform"
+            onClick={() => window.location.href = '/'}
+            className="px-8 py-3 rounded-2xl bg-btn-gradient text-white font-semibold text-sm shadow-lg shadow-purple-200/50 active:scale-[0.97] transition-transform"
           >
             重新开始测试
           </button>
@@ -202,13 +165,12 @@ function ResultPageContent() {
     );
   }
 
-  // After loading/error early returns, we know loadState is 'loaded'
   const loadedResult = result!;
   const loadedDesc = description!;
 
   return (
-    <div className="min-h-screen pb-12">
-      {/* Toast notification */}
+    <div className="min-h-screen bg-gradient-to-b from-purple-50/50 via-pink-50/30 to-white pb-12">
+      {/* Toast */}
       {showToast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-fade-in-up">
           <div className="px-5 py-3 rounded-2xl bg-green-500 text-white text-sm font-semibold shadow-xl shadow-green-200/50 flex items-center gap-2">
@@ -220,7 +182,6 @@ function ResultPageContent() {
         </div>
       )}
 
-      {/* Copied toast */}
       {copied && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-fade-in-up">
           <div className="px-5 py-3 rounded-2xl bg-gray-800 text-white text-sm font-semibold shadow-xl">
@@ -230,13 +191,18 @@ function ResultPageContent() {
       )}
 
       {/* Header */}
-      <div className="pt-6 pb-2 px-5 text-center">
-        <h1 className="text-lg font-bold text-gray-800">你的 MBTI 人格画像</h1>
-        <p className="text-xs text-gray-400 mt-1">基于 {Object.keys(loadedResult.dimensions).reduce((acc, dim) => acc + loadedResult.dimensions[dim as Dimension].answered, 0)} 道题目的分析</p>
+      <div className="pt-8 pb-2 px-5 text-center animate-fade-in-up">
+        <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white/60 backdrop-blur-sm border border-purple-100 text-xs font-medium text-purple-600">
+          <span>🧠</span>
+          <span>MBTI 人格画像</span>
+        </div>
+        <p className="text-xs text-gray-400 mt-2">
+          基于 {Object.keys(loadedResult.dimensions).reduce((acc, dim) => acc + loadedResult.dimensions[dim as Dimension].answered, 0)} 道题目的深度分析
+        </p>
       </div>
 
       {/* Result card */}
-      <div className="px-5 mt-4">
+      <div className="px-5 mt-4 animate-fade-in-up delay-200">
         <ResultCard
           mbtiType={loadedResult.type}
           description={loadedDesc}
@@ -245,32 +211,29 @@ function ResultPageContent() {
         />
       </div>
 
-      {/* Share-to-unlock section (shown when locked) */}
+      {/* Share-to-unlock */}
       {phase === 'locked' && (
-        <div className="px-5 mt-6 animate-fade-in-up delay-300">
-          <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-white/60 shadow-lg shadow-purple-100/30 p-6 text-center">
-            <div className="text-3xl mb-3">🔒</div>
-            <h3 className="text-base font-bold text-gray-800 mb-1">分享解锁完整结果</h3>
-            <p className="text-sm text-gray-500 mb-5">
-              分享给你的好友，即可查看完整的人格解读报告
+        <div className="px-5 mt-8 animate-fade-in-up delay-400">
+          <div className="rounded-3xl bg-white/90 backdrop-blur-sm border border-white/80 shadow-xl shadow-purple-100/40 p-6 text-center">
+            <div className="text-4xl mb-3">🔮</div>
+            <h3 className="text-lg font-bold text-gray-800 mb-1">解锁你的完整人格解读</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              分享给好友，即可查看完整的人格画像、核心优势和成长建议
             </p>
 
-            {/* Share buttons */}
-            <div className="grid grid-cols-4 gap-3 mb-4">
-              {/* 微信 */}
+            <div className="grid grid-cols-4 gap-3 mb-5">
               <button
                 onClick={() => handleShare('wechat')}
                 className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-green-50 border border-green-100 active:scale-95 transition-transform"
               >
                 <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
                   <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 01.213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.295.295a.32.32 0 00.167-.054l1.903-1.114a.864.864 0 01.717-.098 10.16 10.16 0 002.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 01-1.162 1.178A1.17 1.17 0 014.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 01-1.162 1.178 1.17 1.17 0 01-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 01.598.082l1.584.926a.272.272 0 00.14.045c.136 0 .248-.111.248-.247 0-.06-.024-.12-.04-.178l-.326-1.233a.49.49 0 01.177-.556C23.018 17.842 24 16.104 24 14.126c0-3.074-2.903-5.272-7.062-5.268zM14.033 13.4c.535 0 .969.44.969.982a.976.976 0 01-.969.983.976.976 0 01-.969-.983c0-.542.434-.982.97-.982zm4.844 0c.535 0 .969.44.969.982a.976.976 0 01-.969.983.976.976 0 01-.969-.983c0-.542.434-.982.969-.982z"/>
+                    <path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 01.213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.295.295a.32.32 0 00.167-.054l1.903-1.114a.864.864 0 01.717-.098 10.16 10.16 0 002.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 01-1.162 1.178A1.17 1.17 0 014.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 01-1.162 1.178 1.17 1.17 0 01-1.162-1.178c0-.651.52-1.18 1.162-1.18z"/>
                   </svg>
                 </div>
                 <span className="text-xs text-gray-600 font-medium">微信</span>
               </button>
 
-              {/* 朋友圈 */}
               <button
                 onClick={() => handleShare('moments')}
                 className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-blue-50 border border-blue-100 active:scale-95 transition-transform"
@@ -283,7 +246,6 @@ function ResultPageContent() {
                 <span className="text-xs text-gray-600 font-medium">朋友圈</span>
               </button>
 
-              {/* QQ */}
               <button
                 onClick={() => handleShare('qq')}
                 className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-cyan-50 border border-cyan-100 active:scale-95 transition-transform"
@@ -296,7 +258,6 @@ function ResultPageContent() {
                 <span className="text-xs text-gray-600 font-medium">QQ</span>
               </button>
 
-              {/* 复制链接 */}
               <button
                 onClick={() => handleShare('copy')}
                 className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-purple-50 border border-purple-100 active:scale-95 transition-transform"
@@ -310,7 +271,6 @@ function ResultPageContent() {
               </button>
             </div>
 
-            {/* Glowing CTA button */}
             <button
               onClick={() => handleShare('cta')}
               className="w-full py-4 rounded-2xl bg-btn-gradient text-white font-bold text-base shadow-lg shadow-purple-200/50 animate-pulse-glow active:scale-[0.97] transition-transform"
@@ -321,21 +281,21 @@ function ResultPageContent() {
         </div>
       )}
 
-      {/* Sharing in progress indicator */}
+      {/* Sharing indicator */}
       {phase === 'sharing' && (
-        <div className="px-5 mt-6 text-center animate-fade-in">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-50 border border-purple-100">
-            <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+        <div className="px-5 mt-8 text-center animate-fade-in">
+          <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-purple-50 border border-purple-100">
+            <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
             <span className="text-sm text-purple-600 font-medium">正在解锁中...</span>
           </div>
         </div>
       )}
 
-      {/* Share Poster (shown after unlock) */}
+      {/* Share Poster */}
       {showPoster && phase === 'unlocked' && (
-        <div className="px-5 mt-6">
+        <div className="px-5 mt-8 animate-fade-in-up">
           <div className="text-center mb-4">
-            <h3 className="text-base font-bold text-gray-800">生成你的专属海报</h3>
+            <h3 className="text-base font-bold text-gray-800">📸 生成你的专属海报</h3>
             <p className="text-xs text-gray-400 mt-1">保存或分享你的 MBTI 结果卡片</p>
           </div>
           <SharePoster
@@ -347,7 +307,7 @@ function ResultPageContent() {
         </div>
       )}
 
-      {/* Re-share buttons (after unlock) */}
+      {/* Re-share buttons */}
       {phase === 'unlocked' && (
         <div className="px-5 mt-6 animate-fade-in-up">
           <div className="flex gap-3">
@@ -383,32 +343,30 @@ function ResultPageContent() {
       )}
 
       {/* Paid report CTA */}
-      <div className="px-5 mt-8 animate-fade-in-up delay-400">
-        <div className="rounded-2xl bg-gradient-to-r from-amber-50 via-orange-50 to-rose-50 border border-amber-200/50 p-5 text-center">
+      <div className="px-5 mt-10 animate-fade-in-up delay-500">
+        <div className="rounded-3xl bg-gradient-to-r from-amber-50 via-orange-50 to-rose-50 border border-amber-200/50 p-6 text-center shadow-lg shadow-amber-100/30">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <span className="text-xl">📋</span>
-            <h3 className="text-base font-bold text-gray-800">想更深入了解自己？</h3>
+            <span className="text-2xl">📋</span>
+            <h3 className="text-lg font-bold text-gray-800">想更深入了解自己？</h3>
           </div>
-          <p className="text-sm text-gray-500 mb-4">
-            获取你的完整 MBTI 深度解读报告，包含职业建议、人际关系、成长路径等
+          <p className="text-sm text-gray-500 mb-5 leading-relaxed">
+            获取你的完整 MBTI 深度解读报告<br />
+            包含职业建议、人际关系、成长路径等
           </p>
           <button
-            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white font-bold text-base shadow-lg shadow-orange-200/50 active:scale-[0.97] transition-transform"
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white font-bold text-base shadow-lg shadow-orange-200/50 active:scale-[0.97] transition-transform"
             onClick={() => alert('功能开发中，敬请期待！')}
           >
-            获取完整解读报告 ¥9.9
+            🔥 获取完整解读报告 ¥9.9
           </button>
-          <p className="text-xs text-gray-400 mt-2">已有 12,846 人获取了深度报告</p>
+          <p className="text-xs text-gray-400 mt-3">已有 12,846 人获取了深度报告</p>
         </div>
       </div>
 
-      {/* Bottom spacing */}
-      <div className="h-8" />
-
       {/* Retake */}
-      <div className="px-5 mt-2 mb-6 text-center">
+      <div className="px-5 mt-6 mb-8 text-center">
         <button
-          onClick={() => router.push('/')}
+          onClick={() => window.location.href = '/'}
           className="text-sm text-gray-400 underline underline-offset-4 hover:text-gray-600 transition-colors"
         >
           重新测试
@@ -422,9 +380,9 @@ export default function ResultPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-purple-50 via-pink-50/30 to-white">
           <div className="text-center">
-            <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <div className="w-10 h-10 border-3 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             <p className="text-sm text-gray-400">正在分析你的人格...</p>
           </div>
         </div>

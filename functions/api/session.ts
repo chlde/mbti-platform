@@ -1,5 +1,5 @@
 // Cloudflare Pages Function: POST /api/session
-// Replaces Next.js API route for static export deployment
+// Supports 5-option Likert scale answers
 
 interface Env {
   SUPABASE_URL: string;
@@ -8,55 +8,98 @@ interface Env {
 
 interface Answer {
   questionId: number;
-  choice: 'A' | 'B';
+  choice: 1 | 2 | 3 | 4 | 5;
 }
 
-interface Question {
-  id: number;
-  dimension: 'EI' | 'SN' | 'TF' | 'JP';
-  weightA: 'left' | 'right';
+interface QuestionInfo {
+  dimension: string;
+  weightA: string;
 }
 
-// Inline question dimension/weight mapping (must match question-bank-free.ts)
-// Format: [dimension, weightA] per questionId (1-indexed)
-const QUESTION_MAP: Record<number, [string, string]> = {
-  1: ['EI', 'left'], 2: ['EI', 'left'], 3: ['EI', 'left'], 4: ['EI', 'left'], 5: ['EI', 'left'], 6: ['EI', 'left'], 7: ['EI', 'left'],
-  8: ['SN', 'left'], 9: ['SN', 'left'], 10: ['SN', 'left'], 11: ['SN', 'left'], 12: ['SN', 'left'], 13: ['SN', 'left'], 14: ['SN', 'left'],
-  15: ['TF', 'left'], 16: ['TF', 'left'], 17: ['TF', 'left'], 18: ['TF', 'left'], 19: ['TF', 'left'], 20: ['TF', 'left'], 21: ['TF', 'left'],
-  22: ['JP', 'left'], 23: ['JP', 'left'], 24: ['JP', 'left'], 25: ['JP', 'left'], 26: ['JP', 'left'], 27: ['JP', 'left'], 28: ['JP', 'left'],
+// Full question bank mapping: id → {dimension, weightA}
+// Must match question-bank-free.ts (56 questions)
+const QUESTION_MAP: Record<number, QuestionInfo> = {
+  // EI dimension (id 1-14)
+  1: {dimension:'EI',weightA:'left'}, 2: {dimension:'EI',weightA:'left'},
+  3: {dimension:'EI',weightA:'left'}, 4: {dimension:'EI',weightA:'left'},
+  5: {dimension:'EI',weightA:'left'}, 6: {dimension:'EI',weightA:'left'},
+  7: {dimension:'EI',weightA:'left'}, 8: {dimension:'EI',weightA:'left'},
+  9: {dimension:'EI',weightA:'left'}, 10: {dimension:'EI',weightA:'left'},
+  11: {dimension:'EI',weightA:'left'}, 12: {dimension:'EI',weightA:'left'},
+  13: {dimension:'EI',weightA:'left'}, 14: {dimension:'EI',weightA:'left'},
+  // SN dimension (id 15-28)
+  15: {dimension:'SN',weightA:'left'}, 16: {dimension:'SN',weightA:'left'},
+  17: {dimension:'SN',weightA:'left'}, 18: {dimension:'SN',weightA:'left'},
+  19: {dimension:'SN',weightA:'left'}, 20: {dimension:'SN',weightA:'left'},
+  21: {dimension:'SN',weightA:'left'}, 22: {dimension:'SN',weightA:'left'},
+  23: {dimension:'SN',weightA:'left'}, 24: {dimension:'SN',weightA:'left'},
+  25: {dimension:'SN',weightA:'left'}, 26: {dimension:'SN',weightA:'left'},
+  27: {dimension:'SN',weightA:'left'}, 28: {dimension:'SN',weightA:'left'},
+  // TF dimension (id 29-42)
+  29: {dimension:'TF',weightA:'left'}, 30: {dimension:'TF',weightA:'left'},
+  31: {dimension:'TF',weightA:'left'}, 32: {dimension:'TF',weightA:'left'},
+  33: {dimension:'TF',weightA:'left'}, 34: {dimension:'TF',weightA:'left'},
+  35: {dimension:'TF',weightA:'left'}, 36: {dimension:'TF',weightA:'left'},
+  37: {dimension:'TF',weightA:'left'}, 38: {dimension:'TF',weightA:'left'},
+  39: {dimension:'TF',weightA:'left'}, 40: {dimension:'TF',weightA:'left'},
+  41: {dimension:'TF',weightA:'left'}, 42: {dimension:'TF',weightA:'left'},
+  // JP dimension (id 43-56)
+  43: {dimension:'JP',weightA:'left'}, 44: {dimension:'JP',weightA:'left'},
+  45: {dimension:'JP',weightA:'left'}, 46: {dimension:'JP',weightA:'left'},
+  47: {dimension:'JP',weightA:'left'}, 48: {dimension:'JP',weightA:'left'},
+  49: {dimension:'JP',weightA:'left'}, 50: {dimension:'JP',weightA:'left'},
+  51: {dimension:'JP',weightA:'left'}, 52: {dimension:'JP',weightA:'left'},
+  53: {dimension:'JP',weightA:'left'}, 54: {dimension:'JP',weightA:'left'},
+  55: {dimension:'JP',weightA:'left'}, 56: {dimension:'JP',weightA:'left'},
 };
+
+const TOTAL_QUESTIONS = 28;
 
 const DIMENSION_LEFT: Record<string, string> = { EI: 'E', SN: 'S', TF: 'T', JP: 'J' };
 const DIMENSION_RIGHT: Record<string, string> = { EI: 'I', SN: 'N', TF: 'F', JP: 'P' };
 const DIMENSIONS = ['EI', 'SN', 'TF', 'JP'];
 
 function calculateMBTI(answers: Answer[]) {
-  const counts: Record<string, { left: number; right: number }> = {};
+  // Use weighted scoring for 5-option Likert scale
+  const scores: Record<string, { left: number; right: number; answered: number }> = {};
   for (const dim of DIMENSIONS) {
-    counts[dim] = { left: 0, right: 0 };
+    scores[dim] = { left: 0, right: 0, answered: 0 };
   }
 
   for (const answer of answers) {
     const qInfo = QUESTION_MAP[answer.questionId];
     if (!qInfo) continue;
-    const [dim, weightA] = qInfo;
-    const isLeft = answer.choice === 'A' ? weightA === 'left' : weightA !== 'left';
-    if (isLeft) {
-      counts[dim].left += 1;
-    } else {
-      counts[dim].right += 1;
+    const { dimension: dim, weightA } = qInfo;
+
+    let aWeight = 0;
+    let bWeight = 0;
+    switch (answer.choice) {
+      case 1: aWeight = 2.0; break;
+      case 2: aWeight = 1.0; break;
+      case 3: aWeight = 0.5; bWeight = 0.5; break;
+      case 4: bWeight = 1.0; break;
+      case 5: bWeight = 2.0; break;
     }
+
+    if (weightA === 'left') {
+      scores[dim].left += aWeight;
+      scores[dim].right += bWeight;
+    } else {
+      scores[dim].left += bWeight;
+      scores[dim].right += aWeight;
+    }
+    scores[dim].answered += 1;
   }
 
   const dimensions: Record<string, any> = {};
   for (const dim of DIMENSIONS) {
-    const { left, right } = counts[dim];
+    const { left, right, answered } = scores[dim];
     const total = left + right;
     const ratio = total === 0 ? 0.5 : right / total;
     const leftPct = total === 0 ? 50 : Math.round((left / total) * 100);
     const rightPct = total === 0 ? 50 : Math.round((right / total) * 100);
     const winner = ratio > 0.5 ? DIMENSION_RIGHT[dim] : DIMENSION_LEFT[dim];
-    dimensions[dim] = { ratio, left: leftPct, right: rightPct, winner, answered: total };
+    dimensions[dim] = { ratio, left: leftPct, right: rightPct, winner, answered };
   }
 
   const type = DIMENSIONS.map(d => dimensions[d].winner).join('');
@@ -68,9 +111,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   try {
     const body = await context.request.json();
-    const { answers, referrerCode } = body as {
+    const { answers, referrerCode, questionIds } = body as {
       answers: Answer[];
       referrerCode?: string;
+      questionIds?: number[];
     };
 
     if (!Array.isArray(answers) || answers.length === 0) {
@@ -80,7 +124,23 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       });
     }
 
-    // Calculate MBTI result
+    if (answers.length !== TOTAL_QUESTIONS) {
+      return new Response(JSON.stringify({ error: `需要完成全部 ${TOTAL_QUESTIONS} 道题目` }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Validate choice values
+    for (const a of answers) {
+      if (![1, 2, 3, 4, 5].includes(a.choice)) {
+        return new Response(JSON.stringify({ error: '无效的选项值' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     const result = calculateMBTI(answers);
 
     // Resolve referrer

@@ -1,290 +1,394 @@
 export interface Question {
   id: number;
   dimension: 'EI' | 'SN' | 'TF' | 'JP';
-  text: string;        // the question/scenario text
-  optionA: string;     // option A text
-  optionB: string;     // option B text
-  weightA: 'left' | 'right';  // which pole option A points to (e.g. 'left' = E for EI dimension)
+  text: string;
+  poleA: string;   // A端描述（短标签）
+  poleB: string;   // B端描述（短标签）
+  weightA: 'left' | 'right';
 }
 
+// 每次测试从每维度随机抽取7道，共28道
+export const QUESTIONS_PER_DIM = 7;
+export const TOTAL_DIMS = 4;
+export const TOTAL_QUESTIONS = QUESTIONS_PER_DIM * TOTAL_DIMS; // 28
+
 export const freeQuestions: Question[] = [
-  // ===== Q1 - EI =====
+  // ===== EI维度 (id 1-14) =====
   {
-    id: 1,
-    dimension: 'EI',
-    text: '周五下班了！你的手机突然炸了——三个群同时在约你。你的第一反应是？',
-    optionA: '太好了！我先去吃饭那个局，然后再转场去唱K，今晚把能量拉满！',
-    optionB: '哇好多消息……我先安静待会儿，挑一个最想去的就好了，去多了好累。',
-    weightA: 'left', // E
+    id: 1, dimension: 'EI',
+    text: '周五晚上，朋友突然约你出去聚餐，你的第一反应是？',
+    poleA: '太好了，赶紧出发！', poleB: '想在家待着……',
+    weightA: 'left',
   },
-
-  // ===== Q2 - SN =====
   {
-    id: 2,
-    dimension: 'SN',
-    text: '你和朋友在讨论要不要跳槽。你更看重什么来判断？',
-    optionA: '薪资具体涨了多少、通勤时间、五险一金——这些实打实的东西最重要。',
-    optionB: '这份工作未来的发展空间、行业趋势——我觉得眼光要看长远一点。',
-    weightA: 'left', // S
+    id: 2, dimension: 'EI',
+    text: '你一个人在家待了三天没出门，现在的状态？',
+    poleA: '快憋疯了，赶紧约人', poleB: '挺舒服的，独处很珍贵',
+    weightA: 'left',
   },
-
-  // ===== Q3 - TF =====
   {
-    id: 3,
-    dimension: 'TF',
-    text: '你的好朋友兴冲冲给你看她新画的画，但你觉得真的不太好看。她会问你觉得怎么样，你会说？',
-    optionA: '"说实话，构图有点问题，这里可以改进一下。"——真诚的建议才是对朋友好。',
-    optionB: '"哇你画的好认真！颜色选的很好看呀～"——先肯定她的努力，不想打击她的热情。',
-    weightA: 'left', // T
+    id: 3, dimension: 'EI',
+    text: '在一个全是陌生人的聚会里，你会？',
+    poleA: '主动找人聊天，很快打成一片', poleB: '找个角落待着，等别人来搭话',
+    weightA: 'left',
   },
-
-  // ===== Q4 - JP =====
   {
-    id: 4,
-    dimension: 'JP',
-    text: '十一长假快到了，你会怎么安排？',
-    optionA: '提前两周就把机票酒店订好了，每天的行程都做了Excel攻略表，稳稳的。',
-    optionB: '大概想了个方向，到了再看吧～反正随机应变也挺好玩的。',
-    weightA: 'left', // J
+    id: 4, dimension: 'EI',
+    text: '遇到一个复杂问题，你更习惯怎么解决？',
+    poleA: '拉人一起讨论，碰撞出火花', poleB: '先自己安静想清楚再说',
+    weightA: 'left',
   },
-
-  // ===== Q5 - EI =====
   {
-    id: 5,
-    dimension: 'EI',
-    text: '你刚搬到新城市，周末到了。你更可能会？',
-    optionA: '主动约同事出去玩，加入本地的兴趣社群，认识新朋友让我很有活力！',
-    optionB: '自己逛逛附近的咖啡馆和书店，先适应一下环境，慢慢来比较好。',
-    weightA: 'left', // E
-  },
-
-  // ===== Q6 - SN =====
-  {
-    id: 6,
-    dimension: 'SN',
-    text: '你在看一部新剧，朋友问你"这剧好看吗？"你怎么回答？',
-    optionA: '"剧情很紧凑，每集大概30分钟，特效做得不错，豆瓣评分7.8。"——描述具体特点。',
-    optionB: '"看着看着会让人想很多，有种说不出的感觉，我觉得你会喜欢的。"——描述整体感受。',
-    weightA: 'left', // S
-  },
-
-  // ===== Q7 - TF =====
-  {
-    id: 7,
-    dimension: 'TF',
-    text: '团队里两个人因为方案吵起来了，你是组长，怎么处理？',
-    optionA: '把两个方案列出来对比优缺点，用数据说话，哪个逻辑更通就用哪个。',
-    optionB: '先让大家都冷静一下，分别聊聊各自的感受，找到一个大家都能接受的折中方案。',
-    weightA: 'left', // T
-  },
-
-  // ===== Q8 - JP =====
-  {
-    id: 8,
-    dimension: 'JP',
-    text: '你的桌面/房间通常是什么状态？',
-    optionA: '定期整理，东西都有自己的位置，找不到东西会让我焦虑。',
-    optionB: '虽然有点乱但我总能找到需要的东西，偶尔心血来潮会大整理一次。',
-    weightA: 'left', // J
-  },
-
-  // ===== Q9 - EI =====
-  {
-    id: 9,
-    dimension: 'EI',
-    text: '你一个人在家待了整整三天没出门了，现在的状态是？',
-    optionA: '我要憋疯了！赶紧约人出来吃饭看电影，再不出门我要长蘑菇了。',
-    optionB: '还挺舒服的，追追剧看看书，独处的时间对我来说很珍贵。',
-    weightA: 'left', // E
-  },
-
-  // ===== Q10 - SN =====
-  {
-    id: 10,
-    dimension: 'SN',
-    text: '老板让你写一份市场分析报告，你倾向于怎么写？',
-    optionA: '收集最新的销售数据、用户调研结果，用事实和图表支撑结论。',
-    optionB: '从行业大趋势入手，分析未来可能的走向和潜在机会，提出有前瞻性的观点。',
-    weightA: 'left', // S
-  },
-
-  // ===== Q11 - TF =====
-  {
-    id: 11,
-    dimension: 'TF',
-    text: '双十一你在两个手机之间纠结。A手机配置更好性价比高，B手机是你一直喜欢的品牌但略贵。你怎么选？',
-    optionA: '买A。配置参数摆在那里，多花冤枉钱不理性，品牌溢价不值得。',
-    optionB: '买B。虽然贵一点但是用自己喜欢的牌子心情会很好，这种开心值那个差价。',
-    weightA: 'left', // T
-  },
-
-  // ===== Q12 - JP =====
-  {
-    id: 12,
-    dimension: 'JP',
-    text: '交作业/交报告的deadline是下周五，你现在处于什么状态？',
-    optionA: '这周就开始做，周三前完成初稿，周四修改润色，周五从容提交。',
-    optionB: '还有一周呢……下周二三开始做吧，deadline前一晚的灵感最给力。',
-    weightA: 'left', // J
-  },
-
-  // ===== Q13 - EI =====
-  {
-    id: 13,
-    dimension: 'EI',
-    text: '公司团建选了剧本杀，你更想当什么角色？',
-    optionA: '当那个带节奏的活跃玩家，全程疯狂输出，推理的时候跟大家激情碰撞！',
-    optionB: '当一个安静的观察者角色，自己默默分析线索，等想清楚了再发言。',
-    weightA: 'left', // E
-  },
-
-  // ===== Q14 - SN =====
-  {
-    id: 14,
-    dimension: 'SN',
-    text: '你路过一家店，门口排了超长的队。你的第一反应是？',
-    optionA: '掏出手机搜一下这家店的评价、人均消费、招牌菜，看看值不值得排。',
-    optionB: '直接排队试试看！说不定能发现什么惊喜，好奇心驱使我想试试。',
-    weightA: 'left', // S
-  },
-
-  // ===== Q15 - TF =====
-  {
-    id: 15,
-    dimension: 'TF',
-    text: '你的同事犯了个错导致项目延期，领导在会上批评了整个团队。会后你会？',
-    optionA: '找那个同事客观复盘问题出在哪，讨论流程上怎么改进，避免下次再犯。',
-    optionB: '先拍拍那个同事的肩膀说"没事的"，他现在肯定很难受，情绪比问题更重要。',
-    weightA: 'left', // T
-  },
-
-  // ===== Q16 - JP =====
-  {
-    id: 16,
-    dimension: 'JP',
-    text: '你约了朋友周六下午两点喝咖啡，结果朋友临时说有事要改到四点。你心里怎么想？',
-    optionA: '有点不舒服，计划被打乱了……但还是说好的，就调整一下吧。',
-    optionB: '完全OK啊，多出两小时还能做点别的事，改就改呗，无所谓。',
-    weightA: 'left', // J
-  },
-
-  // ===== Q17 - EI =====
-  {
-    id: 17,
-    dimension: 'EI',
-    text: '遇到一个复杂的问题需要解决，你更习惯？',
-    optionA: '拉几个朋友或者同事一起头脑风暴，在讨论中找到答案，碰撞出火花。',
-    optionB: '先自己安静想清楚，理好思路，有结论了再跟别人交流。',
-    weightA: 'left', // E
-  },
-
-  // ===== Q18 - SN =====
-  {
-    id: 18,
-    dimension: 'SN',
-    text: '你看到一个很有意思的设计/产品，你会怎么跟朋友安利？',
-    optionA: '"你看它的材质是XX的，配色用了莫兰迪色系，功能按钮在右侧，手感超好。"',
-    optionB: '"它让我想到了一种很治愈的感觉，就像小时候的那种氛围，总之很有灵魂！"',
-    weightA: 'left', // S
-  },
-
-  // ===== Q19 - TF =====
-  {
-    id: 19,
-    dimension: 'TF',
-    text: '你在朋友圈看到好友发了条很丧的动态，你会？',
-    optionA: '分析一下他遇到了什么问题，如果有办法解决就给他一个实际的建议。',
-    optionB: '立刻私聊他"你还好吗？要不要出来走走？"——陪伴和倾听比解决问题更重要。',
-    weightA: 'left', // T
-  },
-
-  // ===== Q20 - JP =====
-  {
-    id: 20,
-    dimension: 'JP',
-    text: '你去超市买东西，你的购物方式是？',
-    optionA: '提前想好要买什么列个清单，到了直奔目标区域，买完就走，高效。',
-    optionB: '随便逛逛，看到什么想买的就拿，经常买到计划外的东西，但逛超市本身就很开心。',
-    weightA: 'left', // J
-  },
-
-  // ===== Q21 - EI =====
-  {
-    id: 21,
-    dimension: 'EI',
-    text: '周末的下午，阳光很好，你更想？',
-    optionA: '约上几个朋友去户外野餐/飞盘/骑行，人多热闹才有周末的感觉！',
-    optionB: '泡一杯茶，窝在沙发上看看书刷刷手机，一个人享受安静的好天气。',
-    weightA: 'left', // E
-  },
-
-  // ===== Q22 - SN =====
-  {
-    id: 22,
-    dimension: 'SN',
-    text: '你在读一本小说，以下哪种写法更吸引你？',
-    optionA: '大量细腻的环境描写和人物对话，让场景栩栩如生，像看电影一样。',
-    optionB: '有很多隐喻和留白，字里行间藏着深层含义，读完让人浮想联翩。',
-    weightA: 'left', // S
-  },
-
-  // ===== Q23 - TF =====
-  {
-    id: 23,
-    dimension: 'TF',
-    text: '你发现闺蜜/兄弟的对象好像在劈腿（看到了一些暧昧聊天记录），你会？',
-    optionA: '先把证据整理好，逻辑清晰地告诉朋友事实，让他/她自己判断和决定。',
-    optionB: '犹豫要不要说……怕他/她受伤太深，可能先试探一下朋友的感受再选择怎么开口。',
-    weightA: 'left', // T
-  },
-
-  // ===== Q24 - JP =====
-  {
-    id: 24,
-    dimension: 'JP',
-    text: '你的旅行风格更接近哪种？',
-    optionA: '每天几点起床、去哪吃、走什么路线都提前规划好，按照计划执行很安心。',
-    optionB: '到了目的地随心情逛，走到哪算哪，经常会发现攻略上没有的惊喜。',
-    weightA: 'left', // J
-  },
-
-  // ===== Q25 - EI =====
-  {
-    id: 25,
-    dimension: 'EI',
+    id: 5, dimension: 'EI',
     text: '开了一整天会之后，你最想做什么？',
-    optionA: '和同事一起吃个饭吐槽一下今天的会，社交让我放松。',
-    optionB: '赶紧回家，戴上耳机，一个人待着，需要充充电才能恢复。',
-    weightA: 'left', // E
+    poleA: '和同事吃饭吐槽，社交让我放松', poleB: '赶紧回家，一个人待着充电',
+    weightA: 'left',
+  },
+  {
+    id: 6, dimension: 'EI',
+    text: '刚搬到新城市，周末到了，你更可能？',
+    poleA: '主动约同事出去，加入兴趣社群', poleB: '自己逛逛咖啡馆，先适应环境',
+    weightA: 'left',
+  },
+  {
+    id: 7, dimension: 'EI',
+    text: '你更喜欢哪种聊天方式？',
+    poleA: '面对面聊或语音，直接有温度', poleB: '打字聊，可以慢慢组织语言',
+    weightA: 'left',
+  },
+  {
+    id: 8, dimension: 'EI',
+    text: '团建去KTV，你的状态是？',
+    poleA: '抢麦！点歌单早就想好了', poleB: '坐角落听别人唱，偶尔拍拍手',
+    weightA: 'left',
+  },
+  {
+    id: 9, dimension: 'EI',
+    text: '周末阳光很好，你更想？',
+    poleA: '约朋友去户外玩，人多才热闹', poleB: '泡杯茶窝沙发看书，安静享受',
+    weightA: 'left',
+  },
+  {
+    id: 10, dimension: 'EI',
+    text: '你更喜欢哪种工作环境？',
+    poleA: '开放式办公，随时可以讨论交流', poleB: '独立空间，安安静静不被打扰',
+    weightA: 'left',
+  },
+  {
+    id: 11, dimension: 'EI',
+    text: '有人说你是"社牛"还是"社恐"？',
+    poleA: '社牛，到哪都能聊起来', poleB: '社恐，人多了就耗电',
+    weightA: 'left',
+  },
+  {
+    id: 12, dimension: 'EI',
+    text: '做完一项大工作后，你更想？',
+    poleA: '约朋友庆祝一下，分享喜悦', poleB: '给自己一个安静的奖励，独处放松',
+    weightA: 'left',
+  },
+  {
+    id: 13, dimension: 'EI',
+    text: '坐地铁的时候你通常会？',
+    poleA: '跟旁边朋友聊天，或者打电话', poleB: '戴耳机听歌看手机，享受自己的空间',
+    weightA: 'left',
+  },
+  {
+    id: 14, dimension: 'EI',
+    text: '交新朋友对你来说？',
+    poleA: '很容易，我喜欢认识各种人', poleB: '比较慢热，需要时间才熟',
+    weightA: 'left',
   },
 
-  // ===== Q26 - SN =====
+  // ===== SN维度 (id 15-28) =====
   {
-    id: 26,
-    dimension: 'SN',
-    text: '有人说"我觉得AI会彻底改变教育"，你的反应是？',
-    optionA: '"具体怎么改变？目前有哪些实际应用案例？我想了解一下细节。"',
-    optionB: '"这个想法很酷！你觉得再过十年教育会变成什么样？我脑洞已经打开了。"',
-    weightA: 'left', // S
+    id: 15, dimension: 'SN',
+    text: '你在看一部新剧，朋友问"好看吗"，你怎么回答？',
+    poleA: '描述具体特点：节奏、特效、评分', poleB: '描述整体感受：让人想很多，有感觉',
+    weightA: 'left',
+  },
+  {
+    id: 16, dimension: 'SN',
+    text: '讨论要不要跳槽，你更看重什么？',
+    poleA: '薪资、通勤时间、五险一金等实打实的', poleB: '未来发展空间、行业趋势等长远眼光',
+    weightA: 'left',
+  },
+  {
+    id: 17, dimension: 'SN',
+    text: '老板让你写市场分析报告，你倾向于？',
+    poleA: '收集销售数据和调研结果，用图表说话', poleB: '从行业趋势入手，提出前瞻性观点',
+    weightA: 'left',
+  },
+  {
+    id: 18, dimension: 'SN',
+    text: '路过一家排长队的店，你的第一反应？',
+    poleA: '搜一下评价和人均，看看值不值得排', poleB: '直接排队试试，说不定有惊喜',
+    weightA: 'left',
+  },
+  {
+    id: 19, dimension: 'SN',
+    text: '你看到一个有意思的产品，怎么安利给朋友？',
+    poleA: '描述材质、配色、功能等具体细节', poleB: '描述它给你带来的感觉和氛围',
+    weightA: 'left',
+  },
+  {
+    id: 20, dimension: 'SN',
+    text: '有人说"AI会改变教育"，你的反应？',
+    poleA: '追问具体怎么改、有哪些实际案例', poleB: '觉得这个想法很酷，开始畅想未来',
+    weightA: 'left',
+  },
+  {
+    id: 21, dimension: 'SN',
+    text: '你更相信哪种判断？',
+    poleA: '靠经验和事实，看得见摸得着的', poleB: '靠直觉和第六感，感觉对了就对了',
+    weightA: 'left',
+  },
+  {
+    id: 22, dimension: 'SN',
+    text: '读小说，你更喜欢哪种写法？',
+    poleA: '大量细腻的环境描写和对话，像看电影', poleB: '很多隐喻和留白，让人浮想联翩',
+    weightA: 'left',
+  },
+  {
+    id: 23, dimension: 'SN',
+    text: '做一个重要决定时，你更依赖？',
+    poleA: '过往的经验和已知的事实', poleB: '对未来的预感和灵感',
+    weightA: 'left',
+  },
+  {
+    id: 24, dimension: 'SN',
+    text: '跟朋友描述一次旅行，你更可能说？',
+    poleA: '住了哪家酒店、吃了什么菜、花了多少钱', poleB: '那种自由自在的感觉，特别治愈',
+    weightA: 'left',
+  },
+  {
+    id: 25, dimension: 'SN',
+    text: '买东西之前你会？',
+    poleA: '仔细对比参数、看测评、算性价比', poleB: '看眼缘，感觉对了就下手',
+    weightA: 'left',
+  },
+  {
+    id: 26, dimension: 'SN',
+    text: '你更关注的是？',
+    poleA: '当下的实际情况，脚踏实地', poleB: '未来的各种可能性，天马行空',
+    weightA: 'left',
+  },
+  {
+    id: 27, dimension: 'SN',
+    text: '学习新东西，你更偏好？',
+    poleA: '按步骤来，循序渐进掌握基础', poleB: '先看全貌，理解大框架再填细节',
+    weightA: 'left',
+  },
+  {
+    id: 28, dimension: 'SN',
+    text: '做计划时，你更关注？',
+    poleA: '具体的执行步骤和时间节点', poleB: '整体的愿景和方向',
+    weightA: 'left',
   },
 
-  // ===== Q27 - TF =====
+  // ===== TF维度 (id 29-42) =====
   {
-    id: 27,
-    dimension: 'TF',
-    text: '你在淘宝挑东西，两款差不多的产品：A款有10万+评价但差评集中在售后，B款评价少但全部好评。你选？',
-    optionA: '看看差评的具体内容，分析一下售后问题的概率和严重程度，再算算期望值。',
-    optionB: '选B吧，全部好评说明服务态度好，买东西图的就是放心和舒心。',
-    weightA: 'left', // T
+    id: 29, dimension: 'TF',
+    text: '朋友兴冲冲给你看她新画的画，但你觉得不好看，她问你觉得怎么样？',
+    poleA: '说实话，指出可以改进的地方', poleB: '先肯定她的努力，不想打击热情',
+    weightA: 'left',
+  },
+  {
+    id: 30, dimension: 'TF',
+    text: '团队里两人因方案吵架，你是组长，怎么处理？',
+    poleA: '列出来对比优缺点，用数据说话', poleB: '先让大家冷静，聊聊感受找折中方案',
+    weightA: 'left',
+  },
+  {
+    id: 31, dimension: 'TF',
+    text: '两款差不多的手机：A配置好性价比高，B是你喜欢的品牌但贵一点？',
+    poleA: '买A，品牌溢价不值得', poleB: '买B，用喜欢的牌子心情好值那个差价',
+    weightA: 'left',
+  },
+  {
+    id: 32, dimension: 'TF',
+    text: '同事犯了个错导致项目延期，领导批评了全组，会后你会？',
+    poleA: '找同事复盘问题，讨论怎么改进流程', poleB: '先安慰同事，他现在肯定很难受',
+    weightA: 'left',
+  },
+  {
+    id: 33, dimension: 'TF',
+    text: '朋友圈看到好友发了条很丧的动态，你会？',
+    poleA: '分析问题出在哪，给一个实际建议', poleB: '立刻私聊安慰，陪伴比解决问题重要',
+    weightA: 'left',
+  },
+  {
+    id: 34, dimension: 'TF',
+    text: '做一个涉及他人的决定时，你更看重？',
+    poleA: '逻辑上说得通，对事不对人', poleB: '大家的感受，不想让任何人难过',
+    weightA: 'left',
+  },
+  {
+    id: 35, dimension: 'TF',
+    text: '和朋友产生分歧，你更倾向于？',
+    poleA: '摆事实讲道理，谁有理听谁的', poleB: '维护关系更重要，找个折中点',
+    weightA: 'left',
+  },
+  {
+    id: 36, dimension: 'TF',
+    text: '别人向你倾诉烦恼，你通常？',
+    poleA: '帮他分析问题，给出解决方案', poleB: '先共情和倾听，让他知道你在',
+    weightA: 'left',
+  },
+  {
+    id: 37, dimension: 'TF',
+    text: '你觉得"公平"更意味着？',
+    poleA: '一视同仁，按规则办事', poleB: '考虑每个人的具体情况，因人而异',
+    weightA: 'left',
+  },
+  {
+    id: 38, dimension: 'TF',
+    text: '收到批评时，你的第一反应？',
+    poleA: '先想想批评得有没有道理', poleB: '先有点受伤，然后才慢慢消化',
+    weightA: 'left',
+  },
+  {
+    id: 39, dimension: 'TF',
+    text: '选餐厅请朋友吃饭，你更看重？',
+    poleA: '评分高、菜品好、性价比合适', poleB: '氛围好、朋友会喜欢的风格',
+    weightA: 'left',
+  },
+  {
+    id: 40, dimension: 'TF',
+    text: '你更认同哪句话？',
+    poleA: '"对事不对人，实话最重要"', poleB: '"说话要顾及别人的感受"',
+    weightA: 'left',
+  },
+  {
+    id: 41, dimension: 'TF',
+    text: '和朋友AA制吃饭，结账时差了几块钱，你会？',
+    poleA: '精确算清楚，差多少补多少', poleB: '算了算了，几块钱无所谓',
+    weightA: 'left',
+  },
+  {
+    id: 42, dimension: 'TF',
+    text: '你看电影容易？',
+    poleA: '关注剧情逻辑和设定合理性', poleB: '被角色的情感打动，跟着一起哭一起笑',
+    weightA: 'left',
   },
 
-  // ===== Q28 - JP =====
+  // ===== JP维度 (id 43-56) =====
   {
-    id: 28,
-    dimension: 'JP',
-    text: '如果让你选择一种理想的工作模式，你更倾向？',
-    optionA: '有明确的目标和时间节点，按部就班推进，有计划有节奏地完成任务。',
-    optionB: '自由灵活的工作方式，灵感来了就猛干，状态不好就休息，跟着节奏走。',
-    weightA: 'left', // J
+    id: 43, dimension: 'JP',
+    text: '十一长假快到了，你会怎么安排？',
+    poleA: '提前订好机票酒店，做了攻略表', poleB: '大概想个方向，到了再看，随机应变',
+    weightA: 'left',
+  },
+  {
+    id: 44, dimension: 'JP',
+    text: '你的桌面/房间通常是什么状态？',
+    poleA: '定期整理，东西都有固定位置', poleB: '有点乱但总能找到，偶尔心血来潮整理',
+    weightA: 'left',
+  },
+  {
+    id: 45, dimension: 'JP',
+    text: 'deadline是下周五，你现在的状态？',
+    poleA: '这周就开始做，提前完成才安心', poleB: '下周再开始吧，deadline前一晚灵感最给力',
+    weightA: 'left',
+  },
+  {
+    id: 46, dimension: 'JP',
+    text: '约了朋友周六下午两点，他临时改到四点，你心里？',
+    poleA: '有点不舒服，计划被打乱了', poleB: '完全OK，多出两小时还能做别的',
+    weightA: 'left',
+  },
+  {
+    id: 47, dimension: 'JP',
+    text: '你去超市买东西，购物方式是？',
+    poleA: '提前列清单，直奔目标，买完就走', poleB: '随便逛逛，经常买计划外的东西',
+    weightA: 'left',
+  },
+  {
+    id: 48, dimension: 'JP',
+    text: '理想的工作模式？',
+    poleA: '有明确目标和时间节点，按部就班推进', poleB: '自由灵活，灵感来了猛干，状态不好就休息',
+    weightA: 'left',
+  },
+  {
+    id: 49, dimension: 'JP',
+    text: '旅行风格更接近哪种？',
+    poleA: '每天行程提前规划好，按计划执行', poleB: '到了随心情逛，走到哪算哪',
+    weightA: 'left',
+  },
+  {
+    id: 50, dimension: 'JP',
+    text: '你更喜欢哪种周末？',
+    poleA: '安排得满满当当，充实有效率', poleB: '没有计划，睡到自然醒，想干嘛干嘛',
+    weightA: 'left',
+  },
+  {
+    id: 51, dimension: 'JP',
+    text: '做一件事之前，你通常会？',
+    poleA: '先制定详细的计划再动手', poleB: '先开始做，边做边调整',
+    weightA: 'left',
+  },
+  {
+    id: 52, dimension: 'JP',
+    text: '你对"变化"的态度？',
+    poleA: '不太喜欢意外，稳定可控才安心', poleB: '挺喜欢变化的，新鲜感让生活有趣',
+    weightA: 'left',
+  },
+  {
+    id: 53, dimension: 'JP',
+    text: '你的日常安排更像？',
+    poleA: '比较固定，有规律地作息和生活', poleB: '很灵活，每天可能都不一样',
+    weightA: 'left',
+  },
+  {
+    id: 54, dimension: 'JP',
+    text: '面对多个任务时，你倾向于？',
+    poleA: '列清单排优先级，一个一个来', poleB: '同时推进，哪个有灵感先做哪个',
+    weightA: 'left',
+  },
+  {
+    id: 55, dimension: 'JP',
+    text: '你觉得"完美"的标准是？',
+    poleA: '按计划高质量完成，不遗漏细节', poleB: '差不多就行，完成比完美重要',
+    weightA: 'left',
+  },
+  {
+    id: 56, dimension: 'JP',
+    text: '你收拾行李的方式？',
+    poleA: '提前列清单，按类别叠好装好', poleB: '出发前一晚随手塞进去，差不多就行',
+    weightA: 'left',
   },
 ];
+
+/**
+ * 从题库中为每个维度随机抽取指定数量的题目
+ * 使用 seed 来保证同一用户看到的题目顺序一致
+ */
+export function pickRandomQuestions(seed?: number): Question[] {
+  const dims: ('EI' | 'SN' | 'TF' | 'JP')[] = ['EI', 'SN', 'TF', 'JP'];
+  const picked: Question[] = [];
+
+  // Simple seeded random
+  let s = seed || Date.now();
+  const rand = () => {
+    s = (s * 16807 + 0) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+
+  for (const dim of dims) {
+    const pool = freeQuestions.filter(q => q.dimension === dim);
+    // Fisher-Yates shuffle
+    const shuffled = [...pool];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    picked.push(...shuffled.slice(0, QUESTIONS_PER_DIM));
+  }
+
+  // Shuffle the final 28 questions
+  for (let i = picked.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [picked[i], picked[j]] = [picked[j], picked[i]];
+  }
+
+  return picked;
+}
