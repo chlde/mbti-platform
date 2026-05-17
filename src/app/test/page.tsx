@@ -1,16 +1,14 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useCallback, useRef } from 'react';
 import { freeQuestions, Question } from '@/lib/question-bank-free';
 import { Answer } from '@/lib/mbti-calculator';
 import ProgressBar from '@/components/ProgressBar';
 import QuestionCard from '@/components/QuestionCard';
 
-type Phase = 'intro' | 'quiz' | 'done';
+type Phase = 'intro' | 'quiz' | 'submitting';
 
 export default function TestPage() {
-  const router = useRouter();
   const [phase, setPhase] = useState<Phase>('intro');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -19,33 +17,32 @@ export default function TestPage() {
 
   const totalQuestions = freeQuestions.length;
 
-  // Navigate to results when done
-  useEffect(() => {
-    if (phase === 'done' && answers.length === totalQuestions) {
-      // Save answers to sessionStorage BEFORE navigating (avoids URL length limits)
-      sessionStorage.setItem('mbti-answers', JSON.stringify(answers));
+  // Use a ref to track if submission is in progress (prevent double-submit)
+  const submittingRef = useRef(false);
 
-      // Save to Supabase and get sessionId
-      const referrerCode = new URLSearchParams(window.location.search).get('ref');
-      
-      fetch('/api/session', {
+  // Submit answers to server and navigate to results
+  const submitAndNavigate = useCallback(async (finalAnswers: Answer[]) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+
+    const referrerCode = new URLSearchParams(window.location.search).get('ref');
+
+    try {
+      const res = await fetch('/api/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers, referrerCode: referrerCode || undefined }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.sessionId) {
-            router.push(`/result?s=${data.sessionId}`);
-          } else {
-            router.push('/result');
-          }
-        })
-        .catch(() => {
-          router.push('/result');
-        });
+        body: JSON.stringify({ answers: finalAnswers, referrerCode: referrerCode || undefined }),
+      });
+      const data = await res.json();
+      if (data.sessionId) {
+        window.location.href = `/result?s=${data.sessionId}`;
+      } else {
+        window.location.href = '/result';
+      }
+    } catch {
+      window.location.href = '/result';
     }
-  }, [phase, answers.length, totalQuestions, router]);
+  }, []);
 
   const startQuiz = useCallback(() => {
     setPhase('quiz');
@@ -57,23 +54,18 @@ export default function TestPage() {
       const answer: Answer = { questionId: question.id, choice };
 
       // Append or replace answer at current index
-      setAnswers((prev) => {
-        const next = [...prev];
-        next[currentIndex] = answer;
-        return next;
-      });
+      const newAnswers = [...answers];
+      newAnswers[currentIndex] = answer;
+      setAnswers(newAnswers);
 
-      // Animate out, then advance
+      // Animate out
       setSlideDirection('exit');
 
       setTimeout(() => {
         if (currentIndex + 1 >= totalQuestions) {
-          // Quiz complete — set phase to done, effect will navigate
-          setAnswers((prev) => {
-            // ensure all answers are captured
-            setPhase('done');
-            return prev;
-          });
+          // Quiz complete — submit immediately with the known final answers
+          setPhase('submitting');
+          submitAndNavigate(newAnswers);
         } else {
           setCurrentIndex((i) => i + 1);
           setQuestionKey((k) => k + 1);
@@ -81,7 +73,7 @@ export default function TestPage() {
         }
       }, 200);
     },
-    [currentIndex, totalQuestions],
+    [currentIndex, totalQuestions, answers, submitAndNavigate],
   );
 
   const goBack = useCallback(() => {
@@ -144,9 +136,21 @@ export default function TestPage() {
     );
   }
 
+  // ==================== SUBMITTING ====================
+  if (phase === 'submitting') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center animate-fade-in-up">
+          <div className="w-10 h-10 border-3 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">正在分析你的人格...</p>
+          <p className="text-gray-400 text-sm mt-1">请稍候</p>
+        </div>
+      </div>
+    );
+  }
+
   // ==================== QUIZ ====================
   const currentQuestion: Question = freeQuestions[currentIndex];
-  const answeredCount = Math.min(answers.length, currentIndex + 1);
 
   return (
     <div className="min-h-screen flex flex-col">

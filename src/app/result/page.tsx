@@ -1,160 +1,148 @@
 'use client';
 
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useMemo, useState, useCallback, useEffect, Suspense } from 'react';
-import { calculateMBTI, Answer, MBTIResult, Dimension } from '@/lib/mbti-calculator';
+import { useState, useCallback, useEffect, Suspense } from 'react';
+import { calculateMBTI, Answer, MBTIResult, Dimension, DimensionScore } from '@/lib/mbti-calculator';
 import { typeDescriptions, TypeDescription } from '@/lib/type-descriptions';
 import ResultCard from '@/components/ResultCard';
 import SharePoster from '@/components/SharePoster';
+
+type LoadState = 
+  | { status: 'loading' }
+  | { status: 'error'; message: string }
+  | { status: 'loaded'; result: MBTIResult; description: TypeDescription; shareCode: string };
 
 function ResultPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Share-to-unlock state: 'locked' → 'sharing' → 'unlocked'
+  // All hooks declared at the top — count is always fixed
   const [phase, setPhase] = useState<'locked' | 'sharing' | 'unlocked'>('locked');
   const [showToast, setShowToast] = useState(false);
   const [showPoster, setShowPoster] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [serverShareCode, setServerShareCode] = useState<string>('');
+  const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' });
 
-  // Dynamically update OG meta tags based on MBTI result
-  useEffect(() => {
-    let answers: Answer[] | null = null;
-
-    // Try sessionStorage first (new flow)
-    const sessionData = sessionStorage.getItem('mbti-answers');
-    if (sessionData) {
-      try {
-        answers = JSON.parse(sessionData);
-      } catch {
-        // fall through to URL
-      }
-    }
-
-    // Fallback: decode from URL param (old links)
-    if (!answers) {
-      const encoded = searchParams.get('answers');
-      if (encoded) {
-        try {
-          const json = decodeURIComponent(escape(atob(encoded)));
-          answers = JSON.parse(json);
-        } catch {
-          return;
-        }
-      }
-    }
-
-    if (!answers) return;
-    try {
-      const mbtiResult = calculateMBTI(answers);
-      const desc = typeDescriptions[mbtiResult.type];
-      if (!desc) return;
-
-      const title = `我是${mbtiResult.type}「${desc.name}」——快来测测你的MBTI人格！`;
-      const descText = `${desc.tag}。28道精选题目，3分钟发现你的MBTI人格类型。`;
-
-      // Update document title
-      document.title = `${mbtiResult.type}「${desc.name}」| MBTI 人格测试`;
-
-      // Update or create OG meta tags
-      const setMeta = (property: string, content: string) => {
-        let el = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement;
-        if (!el) {
-          el = document.createElement('meta');
-          el.setAttribute('property', property);
-          document.head.appendChild(el);
-        }
-        el.content = content;
-      };
-
-      setMeta('og:title', title);
-      setMeta('og:description', descText);
-      setMeta('og:image', `${window.location.origin}/og-image.png`);
-
-      // Twitter card
-      let twitterTitle = document.querySelector('meta[name="twitter:title"]') as HTMLMetaElement;
-      if (!twitterTitle) {
-        twitterTitle = document.createElement('meta');
-        twitterTitle.name = 'twitter:title';
-        document.head.appendChild(twitterTitle);
-      }
-      twitterTitle.content = title;
-    } catch {
-      // silently fail
-    }
-  }, [searchParams]);
-
-  // Decode answers from sessionStorage (primary) or URL fallback, then calculate result
-  const { result, description, error } = useMemo(() => {
-    let answers: Answer[] | null = null;
-
-    // Try sessionStorage first (new flow)
-    const sessionData = sessionStorage.getItem('mbti-answers');
-    if (sessionData) {
-      try {
-        answers = JSON.parse(sessionData);
-        // Clear after reading so it's not reused on refresh
-        sessionStorage.removeItem('mbti-answers');
-      } catch {
-        // fall through to URL fallback
-      }
-    }
-
-    // Fallback: decode from URL param (backward compatibility for old links)
-    if (!answers) {
-      const encoded = searchParams.get('answers');
-      if (!encoded) {
-        return { result: null, description: null, error: '未找到测试结果，请重新开始测试。' };
-      }
-
-      try {
-        const json = decodeURIComponent(escape(atob(encoded)));
-        answers = JSON.parse(json);
-      } catch {
-        return { result: null, description: null, error: '测试数据解析失败，请重新开始测试。' };
-      }
-    }
-
-    try {
-      if (!Array.isArray(answers) || answers.length === 0) {
-        return { result: null, description: null, error: '测试数据为空，请重新开始测试。' };
-      }
-
-      const mbtiResult: MBTIResult = calculateMBTI(answers);
-      const desc: TypeDescription | undefined = typeDescriptions[mbtiResult.type];
-
-      if (!desc) {
-        return { result: null, description: null, error: '未知的人格类型，请重新测试。' };
-      }
-
-      return { result: mbtiResult, description: desc, error: null };
-    } catch {
-      return { result: null, description: null, error: '测试数据解析失败，请重新开始测试。' };
-    }
-  }, [searchParams]);
-
-  // Fetch server-side session data (share code, referral count)
+  // Fetch result data from server API using sessionId
   useEffect(() => {
     const sessionId = searchParams.get('s');
-    if (sessionId) {
-      fetch(`/api/query-session?id=${sessionId}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.session?.shareCode) {
-            setServerShareCode(data.session.shareCode);
-          }
-        })
-        .catch(() => {
-          // Silently fail — will use client-side fallback
-        });
+    if (!sessionId) {
+      setLoadState({ status: 'error', message: '未找到测试结果，请重新开始测试。' });
+      return;
     }
+
+    fetch(`/api/query-session?id=${sessionId}`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Not found');
+        return res.json();
+      })
+      .then((data) => {
+        const session = data.session;
+        if (!session?.mbtiType) {
+          setLoadState({ status: 'error', message: '未找到测试结果，请重新开始测试。' });
+          return;
+        }
+
+        // Recalculate full result from answers (most reliable)
+        let result: MBTIResult;
+        if (Array.isArray(session.answers) && session.answers.length > 0) {
+          result = calculateMBTI(session.answers as Answer[]);
+        } else {
+          // Fallback: reconstruct DimensionScore objects from raw dimension_scores
+          // Old sessions stored raw numbers like {EI:-7, SN:-7, TF:-7, JP:-7}
+          // Each dimension has 7 questions, raw score = rightCount - leftCount
+          const rawScores = session.dimensionScores || {};
+          const dims: Dimension[] = ['EI', 'SN', 'TF', 'JP'];
+          const DIM_LEFT: Record<Dimension, string> = { EI: 'E', SN: 'S', TF: 'T', JP: 'J' };
+          const DIM_RIGHT: Record<Dimension, string> = { EI: 'I', SN: 'N', TF: 'F', JP: 'P' };
+          const questionsPerDim = 7;
+
+          const dimensions = {} as Record<Dimension, DimensionScore>;
+          for (const dim of dims) {
+            const raw = typeof rawScores[dim] === 'number' ? rawScores[dim] : 0;
+            // If raw is already a DimensionScore object (has 'ratio'), use it directly
+            if (typeof rawScores[dim] === 'object' && rawScores[dim] !== null && 'ratio' in (rawScores[dim] as object)) {
+              dimensions[dim] = rawScores[dim] as unknown as DimensionScore;
+              continue;
+            }
+            // raw = leftCount - rightCount (negative means right wins)
+            // leftCount = (total + raw) / 2, rightCount = (total - raw) / 2
+            const leftCount = Math.max(0, Math.min(questionsPerDim, (questionsPerDim + raw) / 2));
+            const rightCount = questionsPerDim - leftCount;
+            const ratio = rightCount / questionsPerDim;
+            const leftPct = Math.round((leftCount / questionsPerDim) * 100);
+            const rightPct = Math.round((rightCount / questionsPerDim) * 100);
+            const winner = ratio > 0.5 ? DIM_RIGHT[dim] : DIM_LEFT[dim];
+
+            dimensions[dim] = {
+              ratio,
+              left: leftPct,
+              right: rightPct,
+              winner,
+              answered: questionsPerDim,
+            };
+          }
+
+          const summary = dims.map(dim => {
+            const s = dimensions[dim];
+            return `${DIM_LEFT[dim]} ${s.left}% · ${DIM_RIGHT[dim]} ${s.right}%`;
+          });
+
+          result = {
+            type: session.mbtiType,
+            dimensions,
+            confidence: 'high',
+            summary,
+          };
+        }
+
+        // Use recalculated type (from answers) for description lookup — more reliable than stored mbtiType
+        const desc = typeDescriptions[result.type as keyof typeof typeDescriptions];
+        if (!desc) {
+          setLoadState({ status: 'error', message: '未知的人格类型，请重新测试。' });
+          return;
+        }
+
+        const shareCode = session.shareCode || btoa(result.type).replace(/=/g, '').slice(0, 6);
+
+        setLoadState({ status: 'loaded', result, description: desc, shareCode });
+
+        // Update meta tags
+        const title = `我是${result.type}「${desc.name}」——快来测测你的MBTI人格！`;
+        const descText = `${desc.tag}。28道精选题目，3分钟发现你的MBTI人格类型。`;
+        document.title = `${result.type}「${desc.name}」| MBTI 人格测试`;
+
+        const setMeta = (property: string, content: string) => {
+          let el = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement;
+          if (!el) {
+            el = document.createElement('meta');
+            el.setAttribute('property', property);
+            document.head.appendChild(el);
+          }
+          el.content = content;
+        };
+
+        setMeta('og:title', title);
+        setMeta('og:description', descText);
+        setMeta('og:image', `${window.location.origin}/og-image.png`);
+
+        let twitterTitle = document.querySelector('meta[name="twitter:title"]') as HTMLMetaElement;
+        if (!twitterTitle) {
+          twitterTitle = document.createElement('meta');
+          twitterTitle.name = 'twitter:title';
+          document.head.appendChild(twitterTitle);
+        }
+        twitterTitle.content = title;
+      })
+      .catch(() => {
+        setLoadState({ status: 'error', message: '获取测试结果失败，请重新开始测试。' });
+      });
   }, [searchParams]);
 
-  const shareCode = serverShareCode || useMemo(() => {
-    if (!result) return '';
-    return btoa(result.type).replace(/=/g, '').slice(0, 6);
-  }, [result, serverShareCode]);
+  // Extract values for use in render (hooks must not be conditional)
+  const result = loadState.status === 'loaded' ? loadState.result : null;
+  const description = loadState.status === 'loaded' ? loadState.description : null;
+  const shareCode = loadState.status === 'loaded' ? loadState.shareCode : '';
 
   const handleShare = useCallback((platform: string) => {
     // Simulate share action
@@ -182,14 +170,27 @@ function ResultPageContent() {
     }
   }, [shareCode]);
 
+  // Loading state
+  if (loadState.status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-3 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">正在分析你的人格...</p>
+          <p className="text-gray-400 text-sm mt-1">请稍候</p>
+        </div>
+      </div>
+    );
+  }
+
   // Error state
-  if (error) {
+  if (loadState.status === 'error') {
     return (
       <div className="min-h-screen flex items-center justify-center px-5">
         <div className="text-center max-w-sm">
           <div className="text-6xl mb-4">😢</div>
           <h1 className="text-xl font-bold text-gray-800 mb-2">出错了</h1>
-          <p className="text-gray-500 text-sm mb-6">{error}</p>
+          <p className="text-gray-500 text-sm mb-6">{loadState.message}</p>
           <button
             onClick={() => router.push('/')}
             className="px-6 py-3 rounded-2xl bg-btn-gradient text-white font-semibold text-sm shadow-lg shadow-purple-200/50 active:scale-[0.97] transition-transform"
@@ -201,7 +202,9 @@ function ResultPageContent() {
     );
   }
 
-  if (!result || !description) return null;
+  // After loading/error early returns, we know loadState is 'loaded'
+  const loadedResult = result!;
+  const loadedDesc = description!;
 
   return (
     <div className="min-h-screen pb-12">
@@ -229,15 +232,15 @@ function ResultPageContent() {
       {/* Header */}
       <div className="pt-6 pb-2 px-5 text-center">
         <h1 className="text-lg font-bold text-gray-800">你的 MBTI 人格画像</h1>
-        <p className="text-xs text-gray-400 mt-1">基于 {Object.keys(result.dimensions).reduce((acc, dim) => acc + result.dimensions[dim as Dimension].answered, 0)} 道题目的分析</p>
+        <p className="text-xs text-gray-400 mt-1">基于 {Object.keys(loadedResult.dimensions).reduce((acc, dim) => acc + loadedResult.dimensions[dim as Dimension].answered, 0)} 道题目的分析</p>
       </div>
 
       {/* Result card */}
       <div className="px-5 mt-4">
         <ResultCard
-          mbtiType={result.type}
-          description={description}
-          dimensions={result.dimensions}
+          mbtiType={loadedResult.type}
+          description={loadedDesc}
+          dimensions={loadedResult.dimensions}
           revealed={phase === 'unlocked'}
         />
       </div>
@@ -336,9 +339,9 @@ function ResultPageContent() {
             <p className="text-xs text-gray-400 mt-1">保存或分享你的 MBTI 结果卡片</p>
           </div>
           <SharePoster
-            mbtiType={result.type}
-            typeName={description.name}
-            tag={description.tag}
+            mbtiType={loadedResult.type}
+            typeName={loadedDesc.name}
+            tag={loadedDesc.tag}
             shareCode={shareCode}
           />
         </div>
@@ -362,8 +365,8 @@ function ResultPageContent() {
                 const url = `${window.location.origin}?ref=${shareCode}`;
                 if (navigator.share) {
                   navigator.share({
-                    title: `我的MBTI结果是${result.type}「${description.name}」`,
-                    text: `我是${result.type}「${description.name}」——${description.tag}。快来测测你的人格类型吧！`,
+                    title: `我的MBTI结果是${loadedResult.type}「${loadedDesc.name}」`,
+                    text: `我是${loadedResult.type}「${loadedDesc.name}」——${loadedDesc.tag}。快来测测你的人格类型吧！`,
                     url,
                   }).catch(() => {});
                 }

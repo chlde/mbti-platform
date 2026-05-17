@@ -52,6 +52,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
           referralCount: session.referral_count,
           referrerId: session.referrer_id,
           createdAt: session.created_at,
+          answers: session.answers || null,
         },
       }),
       { headers: { 'Content-Type': 'application/json' } }

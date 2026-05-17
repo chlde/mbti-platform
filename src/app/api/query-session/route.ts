@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     const { data: session, error } = await supabase
       .from('sessions')
-      .select('*')
+      .select('id, mode, mbti_type, dimension_scores, share_code, unlocked_modules, referral_count, referrer_id, created_at, answers')
       .eq('id', sessionId)
       .single();
 
@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
         referralCount: session.referral_count,
         referrerId: session.referrer_id,
         createdAt: session.created_at,
+        answers: session.answers,
       },
     });
   } catch (error) {
